@@ -269,6 +269,7 @@ void JE_helpSystem( JE_byte startTopic )
 						switch (lastkey_sym)
 						{
 							case SDLK_UP:
+							case SDLK_LCTRL:
 								menu--;
 								if (menu < 2)
 								{
@@ -277,6 +278,7 @@ void JE_helpSystem( JE_byte startTopic )
 								JE_playSampleNum(S_CURSOR);
 								break;
 							case SDLK_DOWN:
+							case SDLK_LALT:
 								menu++;
 								if (menu > TOPICS)
 								{
@@ -395,6 +397,7 @@ void JE_helpSystem( JE_byte startTopic )
 					case SDLK_LEFT:
 					case SDLK_UP:
 					case SDLK_PAGEUP:
+					case SDLK_LCTRL:
 						page--;
 						JE_playSampleNum(S_CURSOR);
 						break;
@@ -403,6 +406,7 @@ void JE_helpSystem( JE_byte startTopic )
 					case SDLK_PAGEDOWN:
 					case SDLK_RETURN:
 					case SDLK_SPACE:
+					case SDLK_LALT:
 						if (page == MAX_PAGE)
 						{
 							page = 0;
@@ -628,6 +632,7 @@ void JE_loadScreen( void )
 			switch (lastkey_sym)
 			{
 			case SDLK_UP:
+			case SDLK_LCTRL:
 				sel--;
 				if (sel < min)
 				{
@@ -636,6 +641,7 @@ void JE_loadScreen( void )
 				JE_playSampleNum(S_CURSOR);
 				break;
 			case SDLK_DOWN:
+			case SDLK_LALT:
 				sel++;
 				if (sel > max)
 				{
@@ -1251,6 +1257,7 @@ JE_boolean JE_inGameSetup( void )
 					JE_playSampleNum(S_SPRING);
 					break;
 				case SDLK_UP:
+				case SDLK_LCTRL:
 					if (--sel < 1)
 					{
 						sel = 6;
@@ -1258,6 +1265,7 @@ JE_boolean JE_inGameSetup( void )
 					JE_playSampleNum(S_CURSOR);
 					break;
 				case SDLK_DOWN:
+				case SDLK_LALT:
 					if (++sel > 6)
 					{
 						sel = 1;
@@ -1581,7 +1589,7 @@ void JE_highScoreCheck( void )
 
 					if (!playing)
 						play_song(31);
-
+					/*
 					if (mouseButton > 0)
 					{
 						if (mouseX > 56 && mouseX < 142 && mouseY > 123 && mouseY < 149)
@@ -1594,10 +1602,14 @@ void JE_highScoreCheck( void )
 							cancel = true;
 						}
 					}
-					else if (newkey)
+					else 
+					*/
+					if (newkey || newmouse)
 					{
 						bool validkey = false;
 						lastkey_char = toupper(lastkey_char);
+						if(mouse_pressed[0])
+							lastkey_char = SDLK_SPACE;
 						switch(lastkey_char)
 						{
 							//case ' ':
@@ -3077,7 +3089,8 @@ redo:
 	{
 		*mouseX_ = this_player->x;
 		*mouseY_ = this_player->y;
-		button[1-1] = false;
+		if(autoFireMode != AUTOFIRE_BUTTON)
+			button[1-1] = false;
 		button[2-1] = false;
 		button[3-1] = false;
 		button[4-1] = false;
@@ -3165,21 +3178,32 @@ redo:
 				/* keyboard input */
 				if ((inputDevice == 0 || inputDevice == 1 || inputDevice == 2) && !play_demo)
 				{
+					/* Move ship above user finger */
+					int shifted_mouse_y = mouse_y;
+					if( shifted_mouse_y > 160 )
+						shifted_mouse_y += shifted_mouse_y - 160;
 					if (keysactive[keySettings[0]] ||
-						(has_mouse && mouse_pressed[0] && mouse_y < this_player->y))
+						(has_mouse && mouse_pressed[0] && shifted_mouse_y < (this_player->y + 45)))
 						this_player->y -= CURRENT_KEY_SPEED;
 					if (keysactive[keySettings[1]] ||
-						(has_mouse && mouse_pressed[0] && mouse_y > this_player->y))
+						(has_mouse && mouse_pressed[0] && shifted_mouse_y > (this_player->y + 45)))
 						this_player->y += CURRENT_KEY_SPEED;
 
 					if (keysactive[keySettings[2]] ||
-						(has_mouse && mouse_pressed[0] && mouse_x < this_player->x))
+						(has_mouse && mouse_pressed[0] && mouse_x < (this_player->x - 15)))
 						this_player->x -= CURRENT_KEY_SPEED;
 					if (keysactive[keySettings[3]] ||
-						(has_mouse && mouse_pressed[0] && mouse_x > this_player->x))
+						(has_mouse && mouse_pressed[0] && mouse_x > (this_player->x - 15)))
 						this_player->x += CURRENT_KEY_SPEED;
 
-					button[0] = button[0] || keysactive[keySettings[4]] || mouse_pressed[0];
+					if(autoFireMode == AUTOFIRE_BUTTON)
+					{
+						if(newkey && keydown && lastkey_sym == keySettings[4])
+							button[0] = ! button[0];
+					}
+					else
+						button[0] = button[0] || keysactive[keySettings[4]] || ( mouse_pressed[0] && ( autoFireMode == AUTOFIRE_TOUCHSCREEN ) );
+
 					button[3] = button[3] || keysactive[keySettings[5]];
 					button[1] = button[1] || keysactive[keySettings[6]];
 					button[2] = button[2] || keysactive[keySettings[7]];

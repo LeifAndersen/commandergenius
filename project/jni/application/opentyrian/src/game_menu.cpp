@@ -82,7 +82,7 @@ static PlayerItems old_items[2];  // TODO: should not be global if possible
 
 static struct cube_struct cube[4];
 
-static const JE_MenuChoiceType menuChoicesDefault = { 7, 9, 8, 0, 0, 11, (SAVE_FILES_NUM / 2) + 2, 0, 0, 6, 4, 6, 7, 5 };
+static const JE_MenuChoiceType menuChoicesDefault = { 7, 9, 8, 0, 0, 12, (SAVE_FILES_NUM / 2) + 2, 0, 0, 6, 4, 6, 7, 5 };
 static const JE_byte menuEsc[MAX_MENU] = { 0, 1, 1, 1, 2, 3, 3, 1, 8, 0, 0, 11, 3, 0 };
 static const JE_byte itemAvailMap[7] = { 1, 2, 3, 9, 4, 6, 7 };
 static const JE_word planetX[21] = { 200, 150, 240, 300, 270, 280, 320, 260, 220, 150, 160, 210, 80, 240, 220, 180, 310, 330, 150, 240, 200 };
@@ -380,7 +380,7 @@ void JE_itemScreen( void )
 		/* keyboard settings menu */
 		if (curMenu == 5)
 		{
-			for (int x = 2; x <= 11; x++)
+			for (int x = 2; x <= 12; x++)
 			{
 				if (x == curSel[curMenu])
 				{
@@ -393,7 +393,14 @@ void JE_itemScreen( void )
 					temp2 = 28;
 				}
 
-				JE_textShade(VGAScreen, 166, 38 + (x - 2)*12, menuInt[curMenu + 1][x-1], temp2 / 16, temp2 % 16 - 8, DARKEN);
+				if( x == 12 )
+				{
+					char *AutoFireNames[] = { "Touchscreen", "Fire button", "None" };
+					JE_textShade(VGAScreen, 166, 38 + (x - 2)*12, "Auto-Fire", temp2 / 16, temp2 % 16 - 8, DARKEN);
+					JE_textShade(VGAScreen, 236, 38 + (x - 2)*12, AutoFireNames[autoFireMode], temp2 / 16, temp2 % 16 - 8, DARKEN);
+				}
+				else
+					JE_textShade(VGAScreen, 166, 38 + (x - 2)*12, menuInt[curMenu + 1][x-1], temp2 / 16, temp2 % 16 - 8, DARKEN);
 
 				if (x < 10) /* 10 = reset to defaults, 11 = done */
 				{
@@ -402,7 +409,7 @@ void JE_itemScreen( void )
 				}
 			}
 
-			menuChoices[5] = 11;
+			menuChoices[5] = 12;
 		}
 
 		/* Joystick settings menu */
@@ -1030,13 +1037,13 @@ void JE_itemScreen( void )
 						joystick_down |= joystick[j].direction[2];
 					}
 
-					if (keysactive[SDLK_UP] || joystick_up)
+					if (keysactive[SDLK_UP] || keysactive[SDLK_LCTRL] || joystick_up)
 					{
 						yChg = -1;
 						inputDetected = false;
 					}
 
-					if (keysactive[SDLK_DOWN] || joystick_down)
+					if (keysactive[SDLK_DOWN] || keysactive[SDLK_LALT] || joystick_down)
 					{
 						yChg = 1;
 						inputDetected = false;
@@ -1310,6 +1317,7 @@ void JE_itemScreen( void )
 				break;
 
 			case SDLK_UP:
+			case SDLK_LCTRL:
 				keyboardUsed = true;
 				lastDirection = -1;
 
@@ -1335,6 +1343,7 @@ void JE_itemScreen( void )
 				break;
 
 			case SDLK_DOWN:
+			case SDLK_LALT:
 				keyboardUsed = true;
 				lastDirection = 1;
 
@@ -2644,7 +2653,14 @@ void JE_menuFunction( JE_byte select )
 		break;
 
 	case 5: /* keyboard settings */
-		if (curSelect == 10) /* reset to defaults */
+		if (curSelect == 12) /* Auto-Fire mode */
+		{
+			autoFireMode = (AutoFireMode_t)(autoFireMode + 1);
+			if(autoFireMode >= AUTOFIRE_LAST)
+				autoFireMode = AUTOFIRE_TOUCHSCREEN;
+			JE_saveConfiguration();
+		}
+		else if (curSelect == 10) /* reset to defaults */
 		{
 			memcpy(keySettings, defaultKeySettings, sizeof(keySettings));
 		}
