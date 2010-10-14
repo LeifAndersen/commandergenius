@@ -3,10 +3,11 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := application
+APPDIR := $(shell readlink $(LOCAL_PATH)/src)
 
-APP_SUBDIRS := $(patsubst $(LOCAL_PATH)/%, %, $(shell find $(LOCAL_PATH)/src/ -type d))
+APP_SUBDIRS := $(patsubst $(LOCAL_PATH)/%, %, $(shell find $(LOCAL_PATH)/$(APPDIR) -type d))
 ifneq ($(APPLICATION_SUBDIRS_BUILD),)
-APP_SUBDIRS := $(APPLICATION_SUBDIRS_BUILD)
+APP_SUBDIRS := $(addprefix $(APPDIR)/,$(APPLICATION_SUBDIRS_BUILD))
 endif
 
 LOCAL_CFLAGS :=
@@ -20,7 +21,7 @@ endif
 # Paths should be on newline so launchConfigure.sh will work properly
 LOCAL_CFLAGS += \
 				$(foreach D, $(APP_SUBDIRS), -I$(LOCAL_PATH)/$(D)) \
-				-I$(LOCAL_PATH)/../sdl/include \
+				-I$(LOCAL_PATH)/../sdl-$(SDL_VERSION)/include \
 				-I$(LOCAL_PATH)/../sdl_mixer \
 				-I$(LOCAL_PATH)/../sdl_image \
 				-I$(LOCAL_PATH)/../sdl_ttf \
@@ -31,6 +32,9 @@ LOCAL_CFLAGS += \
 				-I$(LOCAL_PATH)/../jpeg \
 				-I$(LOCAL_PATH)/../intl \
 				-I$(LOCAL_PATH)/../freetype/include \
+				-I$(LOCAL_PATH)/../xml2/include \
+				-I$(LOCAL_PATH)/../xerces/src \
+				-I$(LOCAL_PATH)/../lua/src \
 				-I$(LOCAL_PATH)/..
 
 LOCAL_CFLAGS += $(APPLICATION_ADDITIONAL_CFLAGS)
@@ -39,14 +43,13 @@ LOCAL_CFLAGS += $(APPLICATION_ADDITIONAL_CFLAGS)
 LOCAL_CPP_EXTENSION := .cpp
 
 LOCAL_SRC_FILES := $(foreach F, $(APP_SUBDIRS), $(addprefix $(F)/,$(notdir $(wildcard $(LOCAL_PATH)/$(F)/*.cpp))))
-# Uncomment to also add C sources
 LOCAL_SRC_FILES += $(foreach F, $(APP_SUBDIRS), $(addprefix $(F)/,$(notdir $(wildcard $(LOCAL_PATH)/$(F)/*.c))))
 
 ifneq ($(APPLICATION_CUSTOM_BUILD_SCRIPT),)
 LOCAL_SRC_FILES := dummy.c
 endif
 
-LOCAL_SHARED_LIBRARIES := sdl $(COMPILED_LIBRARIES)
+LOCAL_SHARED_LIBRARIES := sdl-$(SDL_VERSION) $(COMPILED_LIBRARIES)
 
 LOCAL_STATIC_LIBRARIES := stlport
 

@@ -23,15 +23,15 @@ Hopefully it will compile a bunch of libs under project/libs/armeabi,
 create file project/bin/DemoActivity-debug.apk and install it on your device or emulator.
 Then you can test it by launching Alien Blaster icon from Android applications menu.
 It's designed for 640x480, so if you have smaller screen it will be resized.
-Note: The game enforces horizontal screen orientation, you may open your keyboard and use it for 
+Note: The game enforces horizontal screen orientation, you may open your keyboard and use it for
 additional keys - the phone will just keep current screen orientation.
 Note that you may use Volume up/down and Camera keys as game inputs -
 you'll have to redefine them in game keyconfig menu.
 Keys Home, Search and End Call will force application quit, and because
 of a bug in my SDL implementation application will crash.
 Back key is mapped to Escape, and Menu is mapped to Enter.
-Newer Android phones like HTC Evo have no keyboard at all, so there are just 3 usable keys - 
-Menu, Volume Up and Volume Down (and Escape of course).
+Newer Android phones like HTC Evo have no keyboard at all, so there are just 4 usable keys -
+Menu, Search, Volume Up and Volume Down (and Escape of course).
 Because of that the accelerometer is configured to trigger cursor key events.
 
 This port also supports GL ES + SDL combo - there is GLXGears demo app in project/jni/application/glxgears,
@@ -81,6 +81,7 @@ SDL_BlitSurface(SDL_GetVideoSurface(), sourceRect, sprite, &targetRect);
 
 To compile your own app, put your app sources into project/jni/application dir, and change symlink "src"
 to point to your app, then launch script ChangeAppSettings.sh - it will ask few questions and modify some Java code.
+You may take AndroidAppSettings.cfg file from some other application to get some sane defaults.
 The C++ files shall have .cpp extension to be compiled, rename them if necessary.
 Also you can replace icon image at project/res/drawable/icon.png.
 Then you can launch build.sh.
@@ -91,14 +92,27 @@ Unzip it, and put in your PATH instead of original NDK - do not rename the targe
 check if there's "crystax" string in path to gcc toolchain, and will disable STLPort because CrystaX's
 NDK already contains STL library.
 
-Application data is not bundled with app itself - it should be downloaded from net on first run.
-Create .ZIP file with your application data, and put it somewhere on HTTP server - ChangeAppSettings.sh
-will ask you for the URL.
-If you'll release new version of data files you should change download URL and update your app as well -
+Application data may be bundled with app itself, or downloaded from net on first run.
+Create .ZIP file with your application data, and put it on HTTP server, or to "project/assets" dir - 
+ChangeAppSettings.sh will ask you for the URL, if URL won't contain "http://" it will try to open file from assets.
+Note that there is some limit on maximum .APK file size on Market, like 20 Mb or so, so big files should be downloaded by HTTP.
+If you'll release new version of data files you should change download URL or asset file name and update your app as well -
 the app will re-download the data if URL does not match the saved URL from previous download.
 
 If you'll add new libs - add them to project/jni/, copy Android.mk from existing lib, and
 add libname to project/jni/<yourapp>/Android.mk
+
+The ARM architecture has some limitations which you have to be aware about -
+if you'll access integer that's not 4-byte aligned you'll get garbage instead of correct value,
+and it's processor-model specific - it may work on some devices and do not work on another ones -
+you may wish to check your code in Android 1.6 emulator from time to time to catch such bugs.
+
+char * p = 0x13; // Non-4 byte aligned pointer
+int i = (int *) p; // We have garbage inside i now
+memcpy( &i, p, sizof(int) ); // The correct way to dereference a non-aligned pointer
+
+This compiler flags will catch most obvious errors, you may add them to AppCflags var in settings:
+-Werror=strict-aliasing -Werror=cast-align -Werror=pointer-arith -Werror=address
 
 How to compile your own application using automake/configure scripts
 ====================================================================
@@ -156,53 +170,77 @@ gdb libsdl.so -ex "list *0x0002ca00"
 
 It will output the exact line in your source where the application crashed.
 
-Known bugs
-==========
+Android Application lifecycle support
+=====================================
 
-0. Application will crash when you're pressing "Home" button or open/close keyboard 
-- the correct behavior for Android apps is to stay in memory and go to foreground 
-when you're launching app again, that's not working yet because
-app will lose OpenGL context (there are rumors that it won't lose GL context in 2.1 SDK).
-Anyway, SDL should sleep inside SDL_Flip() and re-create all HW textures when it gains back video.
+Application may be put to background at any time, for example if user gets phone call onto the device.
+The application will lose OpenGL context then, and has to re-create it when put to foreground.
 
-1. Merge all config screens into single big config screen, make option to rerun config.
+The SDL provides function 
+SDL_ANDROID_SetApplicationPutToBackgroundCallback( callback_t appPutToBackground, callback_t appRestored );
+where callback_t is function pointer of type "void (*) void".
+The default callbacks will call another Android-specific functions:
+SDL_ANDROID_PauseAudioPlayback() and SDL_ANDROID_ResumeAudioPlayback()
+which will pause and resume audio from HW layer, so appplication does not need to destroy and re-init audio.
+Also, the usual event SDL_ACTIVEEVENT with flag SDL_APPACTIVE will be sent when that happens.
 
-2. Fix on-screen keyboard, add more keys and more options, make possible for application to control it.
+If you're using pure SDL 1.2 API (with or without HW acceleration) you don't need to worry about anything -
+the SDL itself will re-create GL textures and fill them with pixel data from existing SDL HW surfaces,
+so you may leave the callbacks to defaults.
 
-3. Add full QWERTY on-screen keyboard.
+If you're using SDL 1.3 API and using SDL_Texture, then the textures pixeldata is lost - you will need 
+to call SDL_UpdateTexture() to refill texture pixeldata from appRestored() callback for all your textures.
+If you're using compatibility API with SDL_Surfaces you don't have to worry about that.
 
-4. Add trackball sensitivity and accelerometer sensitivity config.
+If you're using SDL with OpenGL with either SDL 1.2 or SDL 1.3, the situation is even more grim -
+not only all your GL textures are lost, but all GL matrices, blend modes, etc. has to be re-created.
 
-5. Export phone vibrator to SDL - interface is available in SDL 1.3
+OS may decide there's too little free RAM left on device, and kill background applications 
+without notice, so it vill be good to create temporary savegame etc. from appPutToBackground() callback.
 
-6. HDMI output (HTC Evo and Samsung Epic support that):
-HDMI output will be tricky - I've read the doc here: 
-https://docs.google.com/View?id=dhtsnvs6_57d2hpqtgr#4_1_HDMI_output_support_338048
-It says that in order to output something to HDMI you need to have a VideoView class visible on screen: 
-http://developer.android.com/reference/android/widget/VideoView.html .
-This class does not have any method like "showMyOwnCustomImage()", 
-it just plays the video from the given path, so obvious solution is to create 
-special FIFO file or open a socket, point the VideoView to play this FIFO or socket, 
-and then write raw uncompressed video frames to that FIFO with some small header so that 
-VideoView will recognize it as a proper video format.
-UQM gives 5 FPS without such hacks, if I'll implement that FPS will drop to 1-2 
-(maybe not that bad, I have to actually try that), because you'll have to do huge memcpy(), 
-plus VideoView will contain some buffer to ensure the playback is smooth, 
-so the data on your TV will lag halfsecond behind the data on the device screen.
+Also it's a good practice to pause any application audio, especially if the user gets phone call,
+and if you won't set your own callbacks the default callbacks will do exactly that.
+There are circumstances when you want to avoid that, for example if the application is audio player,
+or if application gets some notification over network (for example you're running a game server,
+and want a beep when someone connects to you) - you may unpause audio for some short time then,
+that will require another thread to watch the network, because main thread will be blocked inside SDL_Flip().
 
-7. Make app data to come inside .apk file in assets instead of downloading it from net.
+The application is not allowed to do any GFX output without OpenGL context (or it will crash),
+that's why SDL_Flip() call will block until we're re-acquired context, and the callbacks will be called
+from inside SDL_Flip().
+The whole idea behind callbacks is that the existing application should not be modified to
+operate correctly - the whole time in background will just look to app as one very long SDL_Flip(),
+so it's good idea to implement some maximum time cap on game frame, so it won't process
+the game to the end level 'till the app is in background, or calculate the difference in time
+between appPutToBackground() and appRestored() and update game time variables.
 
-Games to port
-=============
+Alternatively, you may enable option for unblocked SDL_Flip() in ChangeAppSettings script, 
+then you'll have to implement special event loop right after each SDL_Flip() call:
 
-TeeWorlds
-SuperTux
-LBreakout2
-Commander Genius (only data files for shareware version available for free)
-OpenJazz (only data files for shareware version available for free)
-OpenLieroX (will be damn hard to do, I wrote the code partially)
-ScummVM (they already have their own port, yet it's unfinished)
-Widelands (http://wl.widelands.org/)
+SDL_Flip();
+SDL_Event evt;
+while( SDL_PollEvent(&evt) )
+{
+	if( evt.type == SDL_ACTIVEEVENT->SDL_APPACTIVE && evt.active.gain == 0 && evt.active.state == SDL_APPACTIVE )
+	{
+		// We've lost GL context, we are not allowed to do any GFX output here, or app will crash!
+		while( 1 )
+		{
+			SDL_PollEvent(&evt);
+			if( evt.type == SDL_ACTIVEEVENT->SDL_APPACTIVE && evt.active.gain && evt.active.state == SDL_APPACTIVE )
+			{
+				SDL_Flip(); // One SDL_Flip() call is required here to restore OpenGL context
+				// Re-load all textures, matrixes and all other GL states if we're in SDL+OpenGL mode
+				// Re-load all images to SDL_Texture if we're using it
+				// Now we can draw
+				break;
+			}
+			
+			// Process network stuff, maybe play some sounds using SDL_ANDROID_PauseAudioPlayback() / SDL_ANDROID_ResumeAudioPlayback()
+			SDL_Sleep(200);
+		}
+	}
+}
 
 License information
 ===================

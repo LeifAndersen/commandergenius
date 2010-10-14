@@ -1,1 +1,0 @@
-#define SDL_REVISION "hg-4563:ffd169948438"

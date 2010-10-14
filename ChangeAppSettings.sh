@@ -1,6 +1,6 @@
 #!/bin/sh
 
-CHANGE_APP_SETTINGS_VERSION=8
+CHANGE_APP_SETTINGS_VERSION=10
 AUTO=
 
 if [ "X$1" = "X-a" ]; then
@@ -12,9 +12,6 @@ fi
 if [ "$CHANGE_APP_SETTINGS_VERSION" != "$AppSettingVersion" ]; then
 	AUTO=
 fi
-
-LibSdlVersionOld=$LibSdlVersion
-CompiledLibrariesOld=$CompiledLibraries
 
 var=""
 
@@ -46,9 +43,10 @@ if [ -n "$var" ] ; then
 	ScreenOrientation="$var"
 fi
 
-echo -n "\nSpecify path to download application data in zip archive in the form 'Description|http://URL|http://BackupURL|...'"
+echo -n "\nSpecify path to download application data in zip archive in the form 'Description|URL|MirrorURL|...'"
 echo -n "\nYou may specify additional paths to optional game content delimited by newlines (empty line to finish)"
-echo -n "\nIf the URL in in the form ':dir/file.dat:http://URL/' it will be downloaded as-is to game dir and not unzipped\n\n"
+echo -n "\nIf the URL in in the form ':dir/file.dat:http://URL/' it will be downloaded as-is to game dir and not unzipped"
+echo -n "\nIf the URL does not contain 'http://' it is treated as file in 'project/assets' dir (it is bundled in .apk file)\n\n"
 echo -n "`echo $AppDataDownloadUrl | tr '^' '\\n'`"
 echo
 AppDataDownloadUrl1=""
@@ -92,16 +90,24 @@ if [ -n "$var" ] ; then
 	AppNeedsArrowKeys="$var"
 fi
 
-echo -n "\nApplication uses joystick (y) or (n), the accelerometer (2-axis) or orientation sensor (3-axis)\nwill be used as joystick 0 if not used as arrow keys ($AppUsesJoystick): "
+echo -n "\nApplication uses joystick (y) or (n), the accelerometer (2-axis) or orientation sensor (3-axis)\nwill be used as joystick 0, also on-screen DPAD will be used as joystick ($AppUsesJoystick): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesJoystick="$var"
 fi
 
-echo -n "\nApplication uses multitouch (y) or (n), multitouch events are passed as \n4-axis joysticks 1-5, including pressure and size ($AppUsesMultitouch): "
+echo -n "\nApplication uses multitouch (y) or (n), multitouch events are passed as 4-axis joysticks 1-5, with pressure and size,\nor additionally as SDL_FINGERDOWN/UP/MOTION events in SDL 1.3, with SDL pressure = Android pressure * Andorid touchspot size ($AppUsesMultitouch): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesMultitouch="$var"
+fi
+
+echo -n "\nApplication implements Android-specific routines to put to background, and will not draw anything to screen\n"
+echo -n "between SDL_ACTIVEEVENT->SDL_APPACTIVE lost / gained notifications - you should check for them\n"
+echo -n "rigth after SDL_Flip(), if (n) then SDL_Flip() will block till app in background (y) or (n) ($NonBlockingSwapBuffers): "
+read var
+if [ -n "$var" ] ; then
+	NonBlockingSwapBuffers="$var"
 fi
 
 echo -n "\nRedefine common keys to SDL keysyms: TOUCHSCREEN SEARCH/CALL/DPAD_CENTER VOLUMEUP VOLUMEDOWN MENU BACK CAMERA ENTER DEL"
@@ -142,15 +148,6 @@ if [ -n "$var" ] ; then
 	AppVersionName="$var"
 fi
 
-echo -n "\nOptional shared libraries to compile - removing some of them will save space\nMP3 support by libMAD is encumbered by patents and libMAD is GPL-ed\n"
-grep 'Available libraries:' project/jni/Application.mk 
-grep 'depends on' project/jni/Application.mk
-echo -n "Current: $CompiledLibraries\n\n: "
-read var
-if [ -n "$var" ] ; then
-	CompiledLibraries="$var"
-fi
-
 echo -n "\nApplication uses custom build script AndroidBuild.sh instead of Android.mk (y) or (n) ($CustomBuildScript): "
 read var
 if [ -n "$var" ] ; then
@@ -163,16 +160,32 @@ if [ -n "$var" ] ; then
 	AppCflags="$var"
 fi
 
+echo -n "\nOptional shared libraries to compile - removing some of them will save space\nMP3 support by libMAD is encumbered by patents and libMAD is GPL-ed\n"
+grep 'Available' project/jni/Application.mk 
+grep 'depends on' project/jni/Application.mk
+echo -n "Current: $CompiledLibraries\n\n: "
+read var
+if [ -n "$var" ] ; then
+	CompiledLibraries="$var"
+fi
+
 echo -n "\nAditional LDFLAGS for application ($AppLdflags): "
 read var
 if [ -n "$var" ] ; then
 	AppLdflags="$var"
 fi
 
-echo -n "\nBuild only following subdirs (empty will build all dirs) ($AppSubdirsBuild): "
+echo -n "\nBuild only following subdirs (empty will build all dirs, ignored with custom script) ($AppSubdirsBuild): "
 read var
 if [ -n "$var" ] ; then
 	AppSubdirsBuild="$var"
+fi
+
+echo -n "\nApplication requires C++ RTTI and exceptions - you will need CrystaX toolchain installed at\n"
+echo -n `which ndk-build | sed 's@/[^/]*/ndk-build@/android-ndk-r4-crystax@'` "(y) or (n) ($AppUseCrystaXToolchain): "
+read var
+if [ -n "$var" ] ; then
+	AppUseCrystaXToolchain="$var"
 fi
 
 echo -n "\nHere you may type some short readme text that will be shown when app data is downloaded."
@@ -211,6 +224,7 @@ echo AppUsesMouse=$AppUsesMouse >> AndroidAppSettings.cfg
 echo AppNeedsArrowKeys=$AppNeedsArrowKeys >> AndroidAppSettings.cfg
 echo AppUsesJoystick=$AppUsesJoystick >> AndroidAppSettings.cfg
 echo AppUsesMultitouch=$AppUsesMultitouch >> AndroidAppSettings.cfg
+echo NonBlockingSwapBuffers=$NonBlockingSwapBuffers >> AndroidAppSettings.cfg
 echo RedefinedKeys=\"$RedefinedKeys\" >> AndroidAppSettings.cfg
 echo AppTouchscreenKeyboardKeysAmount=$AppTouchscreenKeyboardKeysAmount >> AndroidAppSettings.cfg
 echo AppTouchscreenKeyboardKeysAmountAutoFire=$AppTouchscreenKeyboardKeysAmountAutoFire >> AndroidAppSettings.cfg
@@ -222,6 +236,7 @@ echo CustomBuildScript=$CustomBuildScript >> AndroidAppSettings.cfg
 echo AppCflags=\'$AppCflags\' >> AndroidAppSettings.cfg
 echo AppLdflags=\'$AppLdflags\' >> AndroidAppSettings.cfg
 echo AppSubdirsBuild=\'$AppSubdirsBuild\' >> AndroidAppSettings.cfg
+echo AppUseCrystaXToolchain=$AppUseCrystaXToolchain >> AndroidAppSettings.cfg
 echo ReadmeText=\'$ReadmeText\' >> AndroidAppSettings.cfg
 
 AppShortName=`echo $AppName | sed 's/ //g'`
@@ -270,6 +285,12 @@ else
 	AppUsesMultitouch=false
 fi
 
+if [ "$NonBlockingSwapBuffers" = "y" ] ; then
+	NonBlockingSwapBuffers=true
+else
+	NonBlockingSwapBuffers=false
+fi
+
 RedefinedKeycodes="-DSDL_ANDROID_KEYCODE_MOUSE=$MouseKeycode"
 KEY2=0
 for KEY in $RedefinedKeys; do
@@ -282,7 +303,7 @@ if [ "$MultiABI" = "y" ] ; then
 else
 	MultiABI="armeabi"
 fi
-LibrariesToLoad="System.loadLibrary(\\\"sdl\\\");"
+LibrariesToLoad="System.loadLibrary(\\\"sdl-$LibSdlVersion\\\");"
 for lib in $CompiledLibraries; do
 	LibrariesToLoad="$LibrariesToLoad System.loadLibrary(\\\"$lib\\\");"
 done
@@ -292,12 +313,6 @@ if [ "$CustomBuildScript" = "n" ] ; then
 fi
 
 ReadmeText="`echo $ReadmeText | sed 's/\"/\\\\\\\\\"/g' | sed 's/[&%]//g'`"
-
-echo Creating symlink to libSDL
-if [ "`readlink project/jni/sdl`" '!=' "../sdl/sdl-$LibSdlVersion" ]; then
-	rm -f project/jni/sdl
-	ln -s ../sdl/sdl-$LibSdlVersion project/jni/sdl
-fi
 
 echo Patching project/AndroidManifest.xml
 cat project/AndroidManifest.xml | \
@@ -326,6 +341,7 @@ cat project/src/Globals.java | \
 	sed "s/public static boolean AppNeedsArrowKeys = .*;/public static boolean AppNeedsArrowKeys = $AppNeedsArrowKeys;/" | \
 	sed "s/public static boolean AppUsesJoystick = .*;/public static boolean AppUsesJoystick = $AppUsesJoystick;/" | \
 	sed "s/public static boolean AppUsesMultitouch = .*;/public static boolean AppUsesMultitouch = $AppUsesMultitouch;/" | \
+	sed "s/public static boolean NonBlockingSwapBuffers = .*;/public static boolean NonBlockingSwapBuffers = $NonBlockingSwapBuffers;/" | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmount = .*;/public static int AppTouchscreenKeyboardKeysAmount = $AppTouchscreenKeyboardKeysAmount;/" | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmountAutoFire = .*;/public static int AppTouchscreenKeyboardKeysAmountAutoFire = $AppTouchscreenKeyboardKeysAmountAutoFire;/" | \
 	sed "s%public static String ReadmeText = .*%public static String ReadmeText = \"$ReadmeText\".replace(\"^\",\"\\\n\");%" | \
@@ -343,7 +359,8 @@ cat project/jni/Android.mk | \
 	sed "s^APPLICATION_ADDITIONAL_LDFLAGS :=.*^APPLICATION_ADDITIONAL_LDFLAGS := $AppLdflags^" | \
 	sed "s^SDL_ADDITIONAL_CFLAGS :=.*^SDL_ADDITIONAL_CFLAGS := $RedefinedKeycodes^" | \
 	sed "s^APPLICATION_SUBDIRS_BUILD :=.*^APPLICATION_SUBDIRS_BUILD := $AppSubdirsBuild^" | \
-	sed "s^APPLICATION_CUSTOM_BUILD_SCRIPT :=.*^APPLICATION_CUSTOM_BUILD_SCRIPT := $CustomBuildScript^" > \
+	sed "s^APPLICATION_CUSTOM_BUILD_SCRIPT :=.*^APPLICATION_CUSTOM_BUILD_SCRIPT := $CustomBuildScript^" | \
+	sed "s^SDL_VERSION :=.*^SDL_VERSION := $LibSdlVersion^"  > \
 	project/jni/Android.mk.1
 if [ -n "`diff -w project/jni/Android.mk.1 project/jni/Android.mk`" ] ; then
 	mv -f project/jni/Android.mk.1 project/jni/Android.mk
@@ -353,7 +370,7 @@ fi
 
 echo Patching project/jni/Application.mk
 cat project/jni/Application.mk | \
-	sed "s/APP_MODULES := .*/APP_MODULES := application sdl sdl_main stlport tremor png jpeg freetype $CompiledLibraries/" | \
+	sed "s/APP_MODULES := .*/APP_MODULES := application sdl-$LibSdlVersion sdl_main stlport tremor png jpeg freetype xerces $CompiledLibraries/" | \
 	sed "s/APP_ABI := .*/APP_ABI := $MultiABI/" > \
 	project/jni/Application.mk.1
 if [ -n "`diff -w project/jni/Application.mk.1 project/jni/Application.mk`" ] ; then
@@ -368,22 +385,22 @@ cat project/res/values/strings.xml | \
 	project/res/values/strings.xml.1
 mv -f project/res/values/strings.xml.1 project/res/values/strings.xml
 
-echo Forcing rebuild of specific files
+echo If you change libSDL version you have to clean all files in project/libs/obj
 rm -rf project/libs/*
 for OUT in obj; do
 rm -rf project/$OUT/local/*/objs/sdl_main/* project/$OUT/local/*/libsdl_main.so
-rm -rf project/$OUT/local/*/libsdl.so
-rm -rf project/$OUT/local/*/libstlport.a # Should be re-linked if you're changing toolchain
-rm -rf project/$OUT/local/*/objs/sdl/src/*/android
-rm -rf project/$OUT/local/*/objs/sdl/src/video/SDL_video.o
-rm -rf project/$OUT/local/*/objs/sdl/SDL_renderer_gles.o
-if [ "$LibSdlVersionOld" '!=' "$LibSdlVersion" ]; then
-	# Internal types are different in SDL 1.2 and 1.3, namely SDL_Rect, so all libs using it have to be recompiled
-	rm -rf project/$OUT/local/*/objs/sdl* project/$OUT/local/*/libsdl*
-	rm -rf project/$OUT/local/*/objs/application project/$OUT/local/*/libapplication.so
-fi
-# Do not rebuild libraries that do not need that
-find project/$OUT/local -name "*.[oa]" -exec touch '{}' \;
+rm -rf project/$OUT/local/*/libsdl-*.so
+rm -rf project/$OUT/local/*/objs/sdl-*/src/*/android
+rm -rf project/$OUT/local/*/objs/sdl-*/src/video/SDL_video.o
+rm -rf project/$OUT/local/*/objs/sdl-*/SDL_renderer_gles.o
+# Do not rebuild several huge libraries that do not depend on SDL version
+for LIB in freetype intl jpeg png lua mad stlport tremor xerces xml2; do
+	for ARCH in armeabi armeabi-v7a; do
+		if [ -e "project/$OUT/local/$ARCH/objs/$LIB" ] ; then
+			find project/$OUT/local/$ARCH/objs/$LIB -name "*.o" | xargs touch -c
+		fi
+	done
+done
 done
 
 echo Done
