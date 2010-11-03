@@ -86,13 +86,14 @@ typedef UBYTE BATTLE_INPUT_STATE;
 #define BATTLE_ESCAPE     ((BATTLE_INPUT_STATE)(1 << 5))
 #define BATTLE_DOWN       ((BATTLE_INPUT_STATE)(1 << 6))
 
-BATTLE_INPUT_STATE CurrentInputToBattleInput (COUNT player);
+BATTLE_INPUT_STATE CurrentInputToBattleInput (COUNT player, int direction /* = -1 for no directional input */);
 BATTLE_INPUT_STATE PulsedInputToBattleInput (COUNT player);
 
 extern CONTROLLER_INPUT_STATE CurrentInputState;
 extern CONTROLLER_INPUT_STATE PulsedInputState;
 extern volatile CONTROLLER_INPUT_STATE ImmediateInputState;
 extern CONTROL_TEMPLATE PlayerControls[];
+extern BOOLEAN EmergencyEscapeWarpUnitActivatedFromMenu;
 
 void UpdateInputState (void);
 extern void FlushInput (void);
@@ -111,6 +112,9 @@ BOOLEAN WaitForAnyButtonUntil (BOOLEAN newButton, TimeCount timeOut,
 		BOOLEAN resetInput);
 BOOLEAN WaitForNoInput (TimePeriod duration, BOOLEAN resetInput);
 BOOLEAN WaitForNoInputUntil (TimeCount timeOut, BOOLEAN resetInput);
+
+/* TODO: only joystick #0 and player #0 supported currently */
+extern BATTLE_INPUT_STATE GetDirectionalJoystickInput(int direction);
 
 void DoPopupWindow(const char *msg);
 

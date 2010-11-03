@@ -21,9 +21,9 @@ common_SRC_FILES := \
 	pngwtran.c \
 	pngwutil.c
 
-common_CFLAGS := ## -fomit-frame-pointer
+common_CFLAGS := -O3
 
-common_C_INCLUDES += \
+common_C_INCLUDES += $(LOCAL_PATH)/include
 
 # For the host
 # =====================================================
@@ -33,9 +33,6 @@ LOCAL_CFLAGS += $(common_CFLAGS)
 LOCAL_C_INCLUDES += $(common_C_INCLUDES)
 
 LOCAL_MODULE:= png
-
-LOCAL_COPY_HEADERS_TO := $(common_COPY_HEADERS_TO)
-LOCAL_COPY_HEADERS := $(common_COPY_HEADERS)
 
 include $(BUILD_STATIC_LIBRARY)
 

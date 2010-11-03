@@ -45,6 +45,9 @@
 
 #define _THIS	SDL_VideoDevice *this
 
+#define DEBUGOUT(...)
+//#define DEBUGOUT(...) __android_log_print(ANDROID_LOG_INFO, "libSDL", __VA_ARGS__)
+
 /* Initialization/Query functions */
 static int ANDROID_VideoInit(_THIS, SDL_PixelFormat *vformat);
 static SDL_Rect **ANDROID_ListModes(_THIS, SDL_PixelFormat *format, Uint32 flags);
@@ -97,7 +100,7 @@ static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects);
 
 /* Private display data */
 
-#define SDL_NUMMODES 4
+#define SDL_NUMMODES 6
 static SDL_Rect *SDL_modelist[SDL_NUMMODES+1];
 
 //#define SDL_modelist		(this->hidden->SDL_modelist)
@@ -221,11 +224,14 @@ int ANDROID_VideoInit(_THIS, SDL_PixelFormat *vformat)
 		SDL_modelist[i]->x = SDL_modelist[i]->y = 0;
 	}
 	/* Modes sorted largest to smallest */
-	SDL_modelist[0]->w = SDL_ANDROID_sWindowWidth; SDL_modelist[0]->h = SDL_ANDROID_sWindowHeight;
-	SDL_modelist[1]->w = 640; SDL_modelist[1]->h = 480; // Will likely be shrinked
-	SDL_modelist[2]->w = 320; SDL_modelist[2]->h = 240; // Always available on any screen and any orientation
-	SDL_modelist[3]->w = 320; SDL_modelist[3]->h = 200; // Always available on any screen and any orientation
-	SDL_modelist[4] = NULL;
+	SDL_modelist[0]->w = SDL_ANDROID_sWindowWidth; 
+	SDL_modelist[0]->h = SDL_ANDROID_sWindowHeight;
+	SDL_modelist[1]->w = 800; SDL_modelist[1]->h = 600; // Will likely be shrinked
+	SDL_modelist[2]->w = 640; SDL_modelist[2]->h = 480; // Will likely be shrinked
+	SDL_modelist[3]->w = 640; SDL_modelist[3]->h = 400; // Will likely be shrinked
+	SDL_modelist[4]->w = 320; SDL_modelist[4]->h = 240; // Always available on any screen and any orientation
+	SDL_modelist[5]->w = 320; SDL_modelist[5]->h = 200; // Always available on any screen and any orientation
+	SDL_modelist[6] = NULL;
 	
 	SDL_VideoInit_1_3(NULL, 0);
 
@@ -259,8 +265,10 @@ SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current,
 	current->pitch = SDL_ANDROID_sFakeWindowWidth * ANDROID_BYTESPERPIXEL;
 	current->pixels = NULL;
 	current->hwdata = NULL;
+
 	HwSurfaceCount = 0;
 	HwSurfaceList = NULL;
+	DEBUGOUT("ANDROID_SetVideoMode() HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 	
 	if( ! sdl_opengl )
 	{
@@ -301,6 +309,7 @@ SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current,
 			HwSurfaceCount++;
 			HwSurfaceList = SDL_realloc( HwSurfaceList, HwSurfaceCount * sizeof(SDL_Surface *) );
 			HwSurfaceList[HwSurfaceCount-1] = current;
+			DEBUGOUT("ANDROID_SetVideoMode() HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 		}
 	}
 
@@ -333,10 +342,12 @@ void ANDROID_VideoQuit(_THIS)
 {
 	if( ! sdl_opengl )
 	{
+		DEBUGOUT("ANDROID_VideoQuit() in HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 		HwSurfaceCount = 0;
 		if(HwSurfaceList)
 			SDL_free(HwSurfaceList);
 		HwSurfaceList = NULL;
+		DEBUGOUT("ANDROID_VideoQuit() out HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 
 		if( SDL_CurrentVideoSurface->hwdata )
 			SDL_DestroyTexture((struct SDL_Texture *)SDL_CurrentVideoSurface->hwdata);
@@ -371,12 +382,14 @@ static int ANDROID_AllocHWSurface(_THIS, SDL_Surface *surface)
 	if ( ! (surface->w && surface->h) )
 		return(-1);
 
+	DEBUGOUT("ANDROID_AllocHWSurface() surface %p w %d h %d", surface, surface->w, surface->h);
 	Uint32 format = SDL_PIXELFORMAT_RGBA5551; // 1-bit alpha for color key, every surface will have colorkey so it's easier for us
 	if( surface->format->Amask )
 	{
 		SDL_PixelFormat format1;
 		int bpp;
 		format = SDL_PIXELFORMAT_RGBA4444;
+		DEBUGOUT("ANDROID_AllocHWSurface() SDL_PIXELFORMAT_RGBA4444");
 		SDL_zero(format1);
 		SDL_PixelFormatEnumToMasks( format, &bpp,
 									&format1.Rmask, &format1.Gmask,
@@ -390,6 +403,7 @@ static int ANDROID_AllocHWSurface(_THIS, SDL_Surface *surface)
 	}
 	else
 	{
+		DEBUGOUT("ANDROID_AllocHWSurface() SDL_PIXELFORMAT_RGBA5551");
 		// HW-accel surface should be RGB565
 		if( !( SDL_CurrentVideoSurface->format->BitsPerPixel == surface->format->BitsPerPixel &&
 			SDL_CurrentVideoSurface->format->Rmask == surface->format->Rmask &&
@@ -414,11 +428,21 @@ static int ANDROID_AllocHWSurface(_THIS, SDL_Surface *surface)
 		SDL_OutOfMemory();
 		return(-1);
 	}
+
+	if( surface->format->Amask )
+	{
+		SDL_SetTextureAlphaMod((struct SDL_Texture *)surface->hwdata, SDL_ALPHA_OPAQUE);
+		SDL_SetTextureBlendMode((struct SDL_Texture *)surface->hwdata, SDL_BLENDMODE_BLEND);
+	}
 	
 	surface->flags |= SDL_HWSURFACE | SDL_HWACCEL;
 	
+
 	HwSurfaceCount++;
+	DEBUGOUT("ANDROID_AllocHWSurface() in HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 	HwSurfaceList = SDL_realloc( HwSurfaceList, HwSurfaceCount * sizeof(SDL_Surface *) );
+	DEBUGOUT("ANDROID_AllocHWSurface() out HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
+
 	HwSurfaceList[HwSurfaceCount-1] = surface;
 	
 	return 0;
@@ -430,7 +454,10 @@ static void ANDROID_FreeHWSurface(_THIS, SDL_Surface *surface)
 	if( !surface->hwdata )
 		return;
 	SDL_DestroyTexture((struct SDL_Texture *)surface->hwdata);
+
+	DEBUGOUT("ANDROID_FreeHWSurface() surface %p w %d h %d in HwSurfaceCount %d HwSurfaceList %p", surface, surface->w, surface->h, HwSurfaceCount, HwSurfaceList);
 	
+
 	for( i = 0; i < HwSurfaceCount; i++ )
 	{
 		if( HwSurfaceList[i] == surface )
@@ -439,6 +466,7 @@ static void ANDROID_FreeHWSurface(_THIS, SDL_Surface *surface)
 			memmove(HwSurfaceList + i, HwSurfaceList + i + 1, sizeof(SDL_Surface *) * (HwSurfaceCount - i) );
 			HwSurfaceList = SDL_realloc( HwSurfaceList, HwSurfaceCount * sizeof(SDL_Surface *) );
 			i = -1;
+			DEBUGOUT("ANDROID_FreeHWSurface() in HwSurfaceCount %d HwSurfaceList %p", HwSurfaceCount, HwSurfaceList);
 			break;
 		}
 	}
@@ -509,38 +537,13 @@ static void ANDROID_UnlockHWSurface(_THIS, SDL_Surface *surface)
 		format.Bmask == surface->format->Bmask &&
 		format.Amask == surface->format->Amask )
 	{
+		DEBUGOUT("ANDROID_UnlockHWSurface() no conversion");
 		converted = surface; // No need for conversion
 	}
 	else
 	{
 		Uint16 x, y;
-		// Extra check not necessary
-		/*
-		if( !( SDL_CurrentVideoSurface->format->BitsPerPixel == surface->format->BitsPerPixel &&
-			SDL_CurrentVideoSurface->format->Rmask == surface->format->Rmask &&
-			SDL_CurrentVideoSurface->format->Gmask == surface->format->Gmask &&
-			SDL_CurrentVideoSurface->format->Bmask == surface->format->Bmask &&
-			SDL_CurrentVideoSurface->format->Amask == surface->format->Amask) )
-			return;
-		*/
-		// TODO: crashes here, so I'm using manual conversion routine
-		/*
-		Uint8 oldAlpha = surface->format->alpha;
-		converted = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h, format.BitsPerPixel,
-											format.Rmask, format.Gmask, format.Bmask, format.Amask);
-		if( !converted ) {
-			SDL_OutOfMemory();
-			return;
-		}
-		SDL_FillRect( converted, NULL, 0 ); // Fill with transparency
-		surface->format->alpha = SDL_ALPHA_OPAQUE;
-		SDL_Rect src, dst;
-		src.x = dst.x = src.y = dst.y = 0;
-		src.w = dst.w = surface->w;
-		src.h = dst.h = surface->h;
-		SDL_UpperBlit( surface, &src, converted, &dst ); // Should take into account colorkey
-		surface->format->alpha = oldAlpha;
-		*/
+
 		converted = SDL_CreateRGBSurface(SDL_SWSURFACE, surface->w, surface->h, format.BitsPerPixel,
 											format.Rmask, format.Gmask, format.Bmask, format.Amask);
 		if( !converted ) {
@@ -552,6 +555,7 @@ static void ANDROID_UnlockHWSurface(_THIS, SDL_Surface *surface)
 		
 		if( surface->flags & SDL_SRCCOLORKEY )
 		{
+			DEBUGOUT("ANDROID_UnlockHWSurface() CONVERT_RGB565_RGBA5551 + colorkey");
 			for( y = 0; y < surface->h; y++ )
 			{
 				Uint16* src = (Uint16 *)( surface->pixels + surface->pitch * y );
@@ -568,6 +572,7 @@ static void ANDROID_UnlockHWSurface(_THIS, SDL_Surface *surface)
 		}
 		else
 		{
+			DEBUGOUT("ANDROID_UnlockHWSurface() CONVERT_RGB565_RGBA5551");
 			for( y = 0; y < surface->h; y++ )
 			{
 				Uint16* src = (Uint16 *)( surface->pixels + surface->pitch * y );
@@ -678,6 +683,7 @@ static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects)
 {
 	//__android_log_print(ANDROID_LOG_INFO, "libSDL", "ANDROID_UpdateRects()");
 	// Used only in single-buffer mode
+	//if( SDL_CurrentVideoSurface && !(SDL_CurrentVideoSurface->flags & SDL_HWSURFACE) )
 	ANDROID_FlipHWSurface(this, SDL_CurrentVideoSurface);
 }
 

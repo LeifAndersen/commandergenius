@@ -2,4 +2,14 @@ project/local.properties
 project/bin
 project/gen
 project/libs
+<<<<<<< HEAD
 project/obj
+=======
+project/assets
+project/obj
+project/src
+project/res/values*
+project/AndroidManifest.xml
+project/jni/Settings.mk
+
+>>>>>>> upstream/sdl_android

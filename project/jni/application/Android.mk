@@ -5,9 +5,13 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := application
 APPDIR := $(shell readlink $(LOCAL_PATH)/src)
 
-APP_SUBDIRS := $(patsubst $(LOCAL_PATH)/%, %, $(shell find $(LOCAL_PATH)/$(APPDIR) -type d))
+APP_SUBDIRS := $(patsubst $(LOCAL_PATH)/%, %, $(shell find $(LOCAL_PATH)/$(APPDIR) -path '*/.svn' -prune -o -type d -print))
 ifneq ($(APPLICATION_SUBDIRS_BUILD),)
-APP_SUBDIRS := $(addprefix $(APPDIR)/,$(APPLICATION_SUBDIRS_BUILD))
+APPLICATION_SUBDIRS_BUILD_NONRECURSIVE := $(addprefix $(APPDIR)/, $(filter-out %/*, $(APPLICATION_SUBDIRS_BUILD)))
+APPLICATION_SUBDIRS_BUILD_RECURSIVE := $(patsubst %/*, %, $(filter %/*,$(APPLICATION_SUBDIRS_BUILD)))
+APPLICATION_SUBDIRS_BUILD_RECURSIVE := $(foreach FINDDIR, $(APPLICATION_SUBDIRS_BUILD_RECURSIVE), $(shell find $(LOCAL_PATH)/$(APPDIR)/$(FINDDIR) -path '*/.svn' -prune -o -type d -print))
+APPLICATION_SUBDIRS_BUILD_RECURSIVE := $(patsubst $(LOCAL_PATH)/%, %, $(APPLICATION_SUBDIRS_BUILD_RECURSIVE) )
+APP_SUBDIRS := $(APPLICATION_SUBDIRS_BUILD_NONRECURSIVE) $(APPLICATION_SUBDIRS_BUILD_RECURSIVE)
 endif
 
 LOCAL_CFLAGS :=
@@ -22,20 +26,7 @@ endif
 LOCAL_CFLAGS += \
 				$(foreach D, $(APP_SUBDIRS), -I$(LOCAL_PATH)/$(D)) \
 				-I$(LOCAL_PATH)/../sdl-$(SDL_VERSION)/include \
-				-I$(LOCAL_PATH)/../sdl_mixer \
-				-I$(LOCAL_PATH)/../sdl_image \
-				-I$(LOCAL_PATH)/../sdl_ttf \
-				-I$(LOCAL_PATH)/../sdl_net \
-				-I$(LOCAL_PATH)/../sdl_blitpool \
-				-I$(LOCAL_PATH)/../sdl_gfx \
-				-I$(LOCAL_PATH)/../png \
-				-I$(LOCAL_PATH)/../jpeg \
-				-I$(LOCAL_PATH)/../intl \
-				-I$(LOCAL_PATH)/../freetype/include \
-				-I$(LOCAL_PATH)/../xml2/include \
-				-I$(LOCAL_PATH)/../xerces/src \
-				-I$(LOCAL_PATH)/../lua/src \
-				-I$(LOCAL_PATH)/..
+				$(foreach L, $(COMPILED_LIBRARIES), -I$(LOCAL_PATH)/../$(L)/include)
 
 LOCAL_CFLAGS += $(APPLICATION_ADDITIONAL_CFLAGS)
 
@@ -49,9 +40,9 @@ ifneq ($(APPLICATION_CUSTOM_BUILD_SCRIPT),)
 LOCAL_SRC_FILES := dummy.c
 endif
 
-LOCAL_SHARED_LIBRARIES := sdl-$(SDL_VERSION) $(COMPILED_LIBRARIES)
+LOCAL_SHARED_LIBRARIES := sdl-$(SDL_VERSION) $(filter-out $(APP_AVAILABLE_STATIC_LIBS), $(COMPILED_LIBRARIES))
 
-LOCAL_STATIC_LIBRARIES := stlport
+LOCAL_STATIC_LIBRARIES := stlport $(filter $(APP_AVAILABLE_STATIC_LIBS), $(COMPILED_LIBRARIES))
 
 LOCAL_LDLIBS := -lGLESv1_CM -ldl -llog -lz
 
@@ -96,11 +87,8 @@ LOCAL_PATH_SDL_APPLICATION := $(LOCAL_PATH)
 $(LOCAL_PATH)/src/libapplication.so: $(LOCAL_PATH)/src/AndroidBuild.sh $(LOCAL_PATH)/src/AndroidAppSettings.cfg
 	cd $(LOCAL_PATH_SDL_APPLICATION)/src && ./AndroidBuild.sh
 
-# $(realpath $(LOCAL_PATH)/../../libs/armeabi/libapplication.so) \
-
 $(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so): $(LOCAL_PATH)/src/libapplication.so OVERRIDE_CUSTOM_LIB
 	cp -f $< $@
-#	$(patsubst %-gcc,%-strip,$(TARGET_CC)) -g $@
 
 .PHONY: OVERRIDE_CUSTOM_LIB
 
