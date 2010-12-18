@@ -17,12 +17,14 @@ import android.view.MotionEvent;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.os.Environment;
 
 import android.widget.TextView;
 import java.lang.Thread;
 import java.util.concurrent.locks.ReentrantLock;
 import android.os.Build;
 import java.lang.reflect.Method;
+import java.util.LinkedList;
 
 
 abstract class DifferentTouchInput
@@ -173,7 +175,7 @@ abstract class DifferentTouchInput
 
 class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 
-	public DemoRenderer(Activity _context)
+	public DemoRenderer(MainActivity _context)
 	{
 		context = _context;
 	}
@@ -186,7 +188,7 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 	}
 
 	public void onSurfaceChanged(GL10 gl, int w, int h) {
-		nativeResize(w, h);
+		nativeResize(w, h, Globals.KeepAspectRatio ? 1 : 0);
 	}
 	
 	public void onSurfaceDestroyed() {
@@ -210,7 +212,10 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 		// Tweak video thread priority, if user selected big audio buffer
 		if(Globals.AudioBufferConfig >= 2)
 			Thread.currentThread().setPriority( (Thread.NORM_PRIORITY + Thread.MIN_PRIORITY) / 2 ); // Lower than normal
-		nativeInit(); // Calls main() and never returns, hehe - we'll call eglSwapBuffers() from native code
+		nativeInit( Globals.DownloadToSdcard ?
+					Environment.getExternalStorageDirectory().getAbsolutePath() + "/app-data/" + Globals.class.getPackage().getName() :
+					context.getFilesDir().getAbsolutePath(),
+					Globals.CommandLine); // Calls main() and never returns, hehe - we'll call eglSwapBuffers() from native code
 		System.exit(0); // The main() returns here - I don't bother with deinit stuff, just terminate process
 	}
 
@@ -225,7 +230,37 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 			mGlContextLost = false;
 			Settings.SetupTouchscreenKeyboardGraphics(context); // Reload on-screen buttons graphics
 		}
+		
+		/*
+		// Pass just one char per frame, many SDL games cannot handle multiple events in a single frame
+		synchronized(context.textInput) {
+			if( context.textInput.size() >= 2 )
+			{
+				if( context.textInput.getFirst() != 0 )
+					nativeTextInput( context.textInput.getFirst(), context.textInput.get(1) );
+				context.textInput.removeFirst();
+				context.textInput.removeFirst();
+			}
+		}
+		*/
+
 		return 1;
+	}
+
+	public void showScreenKeyboard() // Called from native code
+	{
+		class Callback implements Runnable
+		{
+			public MainActivity parent;
+			public void run()
+			{
+				parent.showScreenKeyboard();
+			}
+		}
+		Callback cb = new Callback();
+		cb.parent = context;
+		context.runOnUiThread(cb);
+		//context.showScreenKeyboard();
 	}
 
 	public void exitApp() {
@@ -233,13 +268,14 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 	};
 
 	private native void nativeInitJavaCallbacks();
-	private native void nativeInit();
-	private native void nativeResize(int w, int h);
+	private native void nativeInit(String CurrentPath, String CommandLine);
+	private native void nativeResize(int w, int h, int keepAspectRatio);
 	private native void nativeDone();
 	private native void nativeGlContextLost();
 	public native void nativeGlContextRecreated();
+	public static native void nativeTextInput( int ascii, int unicode );
 
-	private Activity context = null;
+	private MainActivity context = null;
 	private AccelerometerReader accelerometer = null;
 	
 	private EGL10 mEgl = null;
@@ -253,7 +289,7 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 }
 
 class DemoGLSurfaceView extends GLSurfaceView_SDL {
-	public DemoGLSurfaceView(Activity context) {
+	public DemoGLSurfaceView(MainActivity context) {
 		super(context);
 		mParent = context;
 		touchInput = DifferentTouchInput.getInstance();
@@ -284,6 +320,10 @@ class DemoGLSurfaceView extends GLSurfaceView_SDL {
 		super.onPause();
 		mRenderer.mPaused = true;
 	};
+	
+	public boolean isPaused() {
+		return mRenderer.mPaused;
+	}
 
 	@Override
 	public void onResume() {
@@ -306,11 +346,13 @@ class DemoGLSurfaceView extends GLSurfaceView_SDL {
 	 }
 
 	DemoRenderer mRenderer;
-	Activity mParent;
+	MainActivity mParent;
 	DifferentTouchInput touchInput = null;
 
 	public static native void nativeMouse( int x, int y, int action, int pointerId, int pressure, int radius );
 	public static native void nativeKey( int keyCode, int down );
+	public static native void initJavaCallbacks();
+
 }
 
 

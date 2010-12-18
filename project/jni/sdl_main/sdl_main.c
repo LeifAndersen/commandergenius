@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <jni.h>
 #include <android/log.h>
 #include "SDL_thread.h"
@@ -27,11 +28,16 @@
 static int isSdcardUsed = 0;
 
 extern C_LINKAGE void
-JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz )
+JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz, jstring jcurdir, jstring cmdline )
 {
-	int argc = 1;
-	char * argv[] = { "sdl" };
-	char curdir[512];
+	int i = 0;
+	char curdir[PATH_MAX] = "";
+	char realcurdir[PATH_MAX] = "";
+	const jbyte *jstr;
+	const char * str = "sdl";
+	int argc = 0;
+	char ** argv = NULL;
+
 	if( isSdcardUsed )
 	{
 		strcpy(curdir, "/sdcard/app-data/");
@@ -43,11 +49,59 @@ JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz )
 		strcat(curdir, SDL_CURDIR_PATH);
 		strcat(curdir, "/files");
 	}
-	chdir(curdir);
-	setenv("HOME", curdir, 1);
 
-	__android_log_print(ANDROID_LOG_INFO, "libSDL", "Calling SDL_main()" );
+	jstr = (*env)->GetStringUTFChars(env, jcurdir, NULL);
+	if (jstr != NULL && strlen(jstr) > 0)
+		strcpy(curdir, jstr);
+	(*env)->ReleaseStringUTFChars(env, jcurdir, jstr);
+
+	if( realpath(curdir, realcurdir) == NULL )
+		strcpy(realcurdir, curdir);
+	chdir(realcurdir);
+	setenv("HOME", realcurdir, 1);
+
+	jstr = (*env)->GetStringUTFChars(env, cmdline, NULL);
+
+	if (jstr != NULL && strlen(jstr) > 0)
+		str = jstr;
+
+	{
+		char * str1, * str2;
+		str1 = strdup(str);
+		str2 = str1;
+		while(str2)
+		{
+			argc++;
+			str2 = strchr(str2, ' ');
+			if(!str2)
+				break;
+			str2++;
+		}
+
+		argv = (char **)malloc(argc*sizeof(char *));
+		str2 = str1;
+		while(str2)
+		{
+			argv[i] = str2;
+			i++;
+			str2 = strchr(str2, ' ');
+			if(str2)
+				*str2 = 0;
+			else
+				break;
+			str2++;
+		}
+	}
+
+	__android_log_print(ANDROID_LOG_INFO, "libSDL", "Calling SDL_main(\"%s\")", str);
+
+	(*env)->ReleaseStringUTFChars(env, cmdline, jstr);
+
+	for( i = 0; i < argc; i++ )
+		__android_log_print(ANDROID_LOG_INFO, "libSDL", "param %d = \"%s\"", i, argv[i]);
+	
 	main( argc, argv );
+
 };
 
 extern C_LINKAGE void

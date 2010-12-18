@@ -8,10 +8,10 @@ This should be compiled with Android 2.2 SDK and NDK r4b - google for them and i
 (the application will run on Android 1.6 and above).
 You'll need to install Ant too.
 The most supported environnment for that port is Linux, MacOs should be okay too, 
-however if you'll use launchConfigure.sh script you'll have to replace "linux-x86" to "darwin-x86" inside it.
 If you're developing under Windows you'd better install andLinux or Ubuntu+Wubi, to get proper Linux environment
 running inside Windows, then install Linux toolchain on it. I was told andLinux compiles faster than Cygwin.
 Also you'll need full set of Linux utils and symlinks support to launch ChangeAppSettings.sh (sh, grep, sed, tr).
+http://www.pocketmagic.net/?p=1332 - guide how to set up environment in Cygwin.
 
 How to compile Alien Blaster demo application
 =============================================
@@ -26,7 +26,9 @@ It's designed for 640x480, so if you have smaller screen it will be resized.
 Note: The game enforces horizontal screen orientation, you may open your keyboard and use it for
 additional keys - the phone will just keep current screen orientation.
 Recent Android phone models like HTC Evo have no keyboard at all, on-screen keyboard built into libSDL
-is available for such devices (it's rather limited yet, only joystick and 7 keys, no text input).
+is available for such devices - it has joystick (which can be configured as arrow buttons or analog joystick),
+and 6 configurable keys, full text input is toggled with 7-th key. Application may redefine button layout
+and returned keycodes, and also toggle full text input - see SDL_screenkeyboard.h.
 
 This port also supports GL ES + SDL combo - there is GLXGears demo app in project/jni/application/glxgears,
 remove project/jni/application/src symlink and make new one pointing to glxgears, 
@@ -86,14 +88,13 @@ SDL_FreeSurface(sprite);
 // Blit it in HW-accelerated way
 SDL_BlitSurface(hwSprite, sourceRect, SDL_GetVideoSurface(), &targetRect);
 
-// Wrong, blitting SW surfaces to screen not supported
+// Supported, but VERY slow (slower than blitting in SW mode)
 SDL_BlitSurface(sprite, sourceRect, SDL_GetVideoSurface(), &targetRect);
 
-// Wrong, copying from video surface not supported
+// Supported, but VERY slow (use in cases where you need to take a screenshot)
 SDL_BlitSurface(SDL_GetVideoSurface(), sourceRect, sprite, &targetRect);
-// In the future I may add implementation to read screen buffer with glReadPixels(), however it will be slow (okay for screenshots).
 
-To compile your own app, put your app sources into project/jni/application dir (or create symlink to them), 
+To compile your own app, put your app sources into project/jni/application dir (or create symlink to them),
 and change symlink "src" to point to your app:
 
 	cp -r /path/to/my/app project/jni/application/myapp
@@ -103,6 +104,8 @@ then
 	rm project/jni/application/src
 	ln -s myapp project/jni/application/src
 (the second one should be relative link without slashes)
+
+Also your main() function name should be redefined to SDL_main(), if you'll include SDL.h it will do it automatically.
 
 Then launch script ChangeAppSettings.sh - it will ask few questions and modify some Java code.
 You may take AndroidAppSettings.cfg file from some other application to get some sane defaults,
@@ -114,8 +117,10 @@ Then you can launch build.sh.
 The NDK has RTTI and exceptions disabled for C++ code, if you need them you may download modified NDK from
 http://www.crystax.net/android/ndk-r4.php - note however that you cannot throw exceptions across shared library boundary.
 Unzip it, and put in your PATH instead of original NDK - do not rename the target dir, my makefiles will
-check if there's "crystax" string in path to gcc toolchain, and will disable STLPort because CrystaX's
+check if there's "crystax" string in path to gcc toolchain, and will disable STLPort because CrystaX
 NDK already contains STL library.
+One bug is reported with CrystaX NDK - the app crashes when trying to output to std::cout stream on SmartQ V7 device -
+probably some exported symbol is duplicated in system libraries and the CrystaX STL lib.
 
 Application data may be bundled with app itself, or downloaded from net on first run.
 Create .ZIP file with your application data, and put it on HTTP server, or to "project/jni/application/src/AndroidData" dir - 
@@ -129,6 +134,12 @@ add libname to project/jni/<yourapp>/Android.mk
 If lib contains "configure" script - go to lib dir and execute command "../launchConfigureLib.sh" - it will
 launch "configure" with appropriate environment and will create the "config.h" file at least, though linking
 will most probably fail because of ranlib - just edit Android.mk to compile lib sources and remove all tools and tests.
+
+MIDI support can be emulated via SDL_mixer lib (it uses Timidity internally)- download file
+http://www.libsdl.org/projects/mixer/timidity/timidity.tar.gz
+unpack it and put "timidity" dir into your game data zipfile.
+Or you may paste this URL directly as an optional download in ChangeAppSettings.sh:
+MIDI music support (18 Mb)|http://sourceforge.net/projects/libsdl-android/files/timidity.zip/download
 
 The ARM architecture has some limitations which you have to be aware about -
 if you'll access integer that's not 4-byte aligned you'll get garbage instead of correct value,
@@ -145,19 +156,13 @@ This compiler flags will catch most obvious errors, you may add them to AppCflag
 How to compile your own application using automake/configure scripts
 ====================================================================
 
-There is limited support for "configure" scripts, I've managed to compile lbreakout2 that way,
+There is limited support for "configure" scripts, I'm compiling scummvm this way,
 though ./configure scripts tend to have stupid bugs in various places, avoid using that method if you can.
-1. Download lbreakout2-2.6.1.tar.gz from http://lgames.sourceforge.net/, unpack it to project/jni/application dir.
-2. Determine libraries needed for your app, launch ChangeAppSettings.sh, select correct libSDL version
-   (1.2 for lbreakout2), and correct libs (sdl_mixer sdl_image sdl_net for lbreakout2), also change name etc.
-3. Launch ./build.sh, wait till it builds all .so files
-4. Go to project/jni/application/lbreakout2-2.6.1 dir, and launch command
-   ../launchConfigure.sh --disable-install --enable-sdl-net LIBS=-lintl
-5. Watch how ./configure configures, if it fails fix launchConfigure.sh, rinse and repeat.
-6. Launch make, and pray. If you're lucky it will create application binary (lbreakout2-2.6.1/client/lbreakout2)
-7. Move the application binary to dir project/libs/armeabi, rename it to libapplication.so (overwrite old file)
-8. Run command "arm-eabi-strip -g libapplication.so", you can find arm-eabi-strip under your NDK dir.
-9. Run "ant debug" or "ant release" from project dir, install to device & enjoy.
+You should enable custom build script in ChangeAppSettings.sh, and you should create script
+AndroidBuild.sh and put it under project/jni/application/src dir. The AndroidBuild.sh script should 
+generate file project/jni/application/src/libapplication.so, which will be copied into .apk file by build system.
+There is helper script project/jni/application/setEnvironment.sh which will set CFLAGS and LDFLAGS
+for configure script and makefile, see AndroidBuild.sh in project/jni/application/scummvm dir for reference.
 
 Android Application lifecycle support
 =====================================
@@ -172,6 +177,8 @@ The default callbacks will call another Android-specific functions:
 SDL_ANDROID_PauseAudioPlayback() and SDL_ANDROID_ResumeAudioPlayback()
 which will pause and resume audio from HW layer, so appplication does not need to destroy and re-init audio.
 Also, the usual event SDL_ACTIVEEVENT with flag SDL_APPACTIVE will be sent when that happens.
+If you're using OpenAL for an audio playback you have to call functions al_android_pause_playback()
+and al_android_resume_playback() by yourself when SDL calls your callbacks.
 
 If you're using pure SDL 1.2 API (with or without HW acceleration) you don't need to worry about anything -
 the SDL itself will re-create GL textures and fill them with pixel data from existing SDL HW surfaces,
@@ -210,7 +217,7 @@ SDL_Flip();
 SDL_Event evt;
 while( SDL_PollEvent(&evt) )
 {
-	if( evt.type == SDL_ACTIVEEVENT->SDL_APPACTIVE && evt.active.gain == 0 && evt.active.state == SDL_APPACTIVE )
+	if( evt.type == SDL_ACTIVEEVENT && evt.active.gain == 0 && evt.active.state == SDL_APPACTIVE )
 	{
 		// We've lost GL context, we are not allowed to do any GFX output here, or app will crash!
 		while( 1 )
@@ -273,16 +280,37 @@ gdb libsdl.so -ex "list *0x0002ca00"
 
 It will output the exact line in your source where the application crashed.
 
+If your application does not work for unknown reasons, there may be the case when it exports some symbol
+that clash with exports from system libraries - run checkExports.sh to check this.
+
+If your application fails to load past startup SDL logo with error
+
+I/dalvikvm( 3401): Unable to dlopen(/data/data/com.svc/lib/libapplication.so): Cannot load library: alloc_mem_region[847]: OOPS:  1268 cannot map library 'libapplication.so'. no vspace available.
+
+that means you're allocating huge data buffer in heap (that may be C static or global buffer variable).
+Use command "objdump -x libapplication.so", it might output something like this:
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+ 13 .bss          0b64544c  00051670  00051670  0005066c  2**3
+
+and below
+
+0848c8c8 g     O .bss   0320a000 decoder_svc_PictureBuffer_RefY
+
+which means your BSS segment eats up 191 Mb of RAM, and symbol 'decoder_svc_PictureBuffer_RefY' eats up 52 Mb,
+while heap memory limit on most phones is 16 Mb.
+
 License information
 ===================
 
 The libSDL port itself is licensed under LGPL, so you may use it for commercial app without releasing sources,
-however you'll have to release the file ChangeAppSettings.sh to allow linking newer version of libSDL with
+however you'll have to release the file AndroidAppSettings.cfg to allow linking newer version of libSDL with
 your compiled application, as LGPL requires.
 It contains separate libraries under project/jni, each of which has it's own license,
 I've tried to compile all LGPL-ed libs as shared libs but you should anyway inspect the licenses
 of the libraries you're linking to if you're creating closed-source app.
-libMAD is licensed under GPL, so if you're planning to make commercial app you should avoid using it,
-otherwise you'll have to release your application sources under GPL too.
+libmad and liblzo2 are licensed under GPL, so if you're planning to make commercial app you should avoid 
+using them, otherwise you'll have to release your application sources under GPL too.
 
 The "Ultimate Droid" button theme by Sean Stieber is licensed under Creative Commons - Attribution license.

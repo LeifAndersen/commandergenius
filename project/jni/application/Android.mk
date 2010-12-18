@@ -74,17 +74,22 @@ please make this library static to avoid problems. ) )
 $(error Detected libraries with too long symbol names. Remove all files under project/libs/armeabi, make these libs static, and recompile)
 endif
 
+APP_LIB_DEPENDS := $(foreach LIB, $(LOCAL_SHARED_LIBRARIES), $(abspath $(LOCAL_PATH)/../../obj/local/armeabi/lib$(LIB).so)) 
+APP_LIB_DEPENDS += $(foreach LIB, $(LOCAL_STATIC_LIBRARIES), $(abspath $(LOCAL_PATH)/../../obj/local/armeabi/lib$(LIB).a))
+
 include $(BUILD_SHARED_LIBRARY)
 
 ifneq ($(APPLICATION_CUSTOM_BUILD_SCRIPT),)
 
-$(info LOCAL_PATH $(LOCAL_PATH) )
-$(info $(LOCAL_PATH)/src/libapplication.so )
-$(info $(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so) )
-
 LOCAL_PATH_SDL_APPLICATION := $(LOCAL_PATH)
 
-$(LOCAL_PATH)/src/libapplication.so: $(LOCAL_PATH)/src/AndroidBuild.sh $(LOCAL_PATH)/src/AndroidAppSettings.cfg
+.NOTPARALLEL: $(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so) $(LOCAL_PATH)/src/libapplication.so
+
+$(shell rm $(LOCAL_PATH)/src/libapplication.so) # Enforce rebuilding
+# $(shell rm $(LOCAL_PATH)/../../obj/local/armeabi/*.so) # libapplication.so may try to link with wrong libraries, prevent that
+
+$(LOCAL_PATH)/src/libapplication.so: $(LOCAL_PATH)/src/AndroidBuild.sh $(LOCAL_PATH)/src/AndroidAppSettings.cfg $(APP_LIB_DEPENDS)
+	echo Launching script $(LOCAL_PATH_SDL_APPLICATION)/AndroidBuild.sh
 	cd $(LOCAL_PATH_SDL_APPLICATION)/src && ./AndroidBuild.sh
 
 $(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so): $(LOCAL_PATH)/src/libapplication.so OVERRIDE_CUSTOM_LIB

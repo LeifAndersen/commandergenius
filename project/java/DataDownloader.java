@@ -8,12 +8,23 @@ import android.view.MotionEvent;
 import android.view.KeyEvent;
 import android.view.Window;
 import android.view.WindowManager;
+import android.os.Environment;
 
 import android.widget.TextView;
 import org.apache.http.client.methods.*;
 import org.apache.http.*;
+import org.apache.http.params.BasicHttpParams;
+import org.apache.http.conn.*;
+import org.apache.http.conn.params.*;
+import org.apache.http.conn.scheme.*;
+import org.apache.http.conn.ssl.*;
 import org.apache.http.impl.*;
 import org.apache.http.impl.client.*;
+import org.apache.http.impl.conn.SingleClientConnManager;
+import java.security.cert.*;
+import java.security.SecureRandom;
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
 import java.util.zip.*;
 import java.io.*;
 import android.util.Log;
@@ -139,16 +150,15 @@ class DataDownloader extends Thread
 		//Status.setText( "Connecting to " + Globals.DataDownloadUrl );
 		outFilesDir = Parent.getFilesDir().getAbsolutePath();
 		if( Globals.DownloadToSdcard )
-			outFilesDir = "/sdcard/app-data/" + Globals.class.getPackage().getName();
+			outFilesDir = Environment.getExternalStorageDirectory().getAbsolutePath() + "/app-data/" + Globals.class.getPackage().getName();
 		DownloadComplete = false;
 		this.start();
 	}
 	
-	public void setParent(MainActivity _Parent, TextView _Status)
+	public void setStatusField(TextView _Status)
 	{
 		synchronized(this) {
-			Parent = _Parent;
-			Status.setParent( _Status, _Parent );
+			Status.setParent( _Status, Parent );
 		}
 	}
 
@@ -252,7 +262,7 @@ class DataDownloader extends Thread
 				request = new HttpGet(url);
 				request.addHeader("Accept", "*/*");
 				try {
-					DefaultHttpClient client = new DefaultHttpClient();
+					DefaultHttpClient client = HttpWithDisabledSslCertCheck();
 					client.getParams().setBooleanParameter("http.protocol.handle-redirects", true);
 					response = client.execute(request);
 				} catch (IOException e) {
@@ -484,6 +494,27 @@ class DataDownloader extends Thread
 	{
 		return outFilesDir + "/" + filename;
 	};
+	
+	private static DefaultHttpClient HttpWithDisabledSslCertCheck()
+	{
+		/*
+        HostnameVerifier hostnameVerifier = org.apache.http.conn.ssl.SSLSocketFactory.ALLOW_ALL_HOSTNAME_VERIFIER;
+
+        DefaultHttpClient client = new DefaultHttpClient();
+
+        SchemeRegistry registry = new SchemeRegistry();
+        SSLSocketFactory socketFactory = SSLSocketFactory.getSocketFactory();
+        socketFactory.setHostnameVerifier((X509HostnameVerifier) hostnameVerifier);
+        registry.register(new Scheme("https", socketFactory, 443));
+        SingleClientConnManager mgr = new SingleClientConnManager(client.getParams(), registry);
+        DefaultHttpClient http = new DefaultHttpClient(mgr, client.getParams());
+
+        HttpsURLConnection.setDefaultHostnameVerifier(hostnameVerifier);
+
+        return http;
+        */
+        return new DefaultHttpClient();
+	}
 	
 	public StatusWriter Status;
 	public boolean DownloadComplete = false;

@@ -3,9 +3,12 @@ package net.sourceforge.clonekeenplus;
 
 import android.app.Activity;
 import android.content.Context;
+import java.util.Vector;
 
 class Globals {
 	public static String ApplicationName = "CommanderGenius";
+
+	public static final boolean Using_SDL_1_3 = false;
 
 	// Should be zip file
 	public static String DataDownloadUrl = "Data files are 2 Mb|https://sourceforge.net/projects/libsdl-android/files/CommanderGenius/commandergenius-data.zip/download^High-quality GFX and music - 40 Mb|https://sourceforge.net/projects/libsdl-android/files/CommanderGenius/commandergenius-hqp.zip/download";
@@ -22,9 +25,15 @@ class Globals {
 	// Readme text to be shown on download page
 	public static String ReadmeText = "^You may press \"Home\" now - the data will be downloaded in background".replace("^","\n");
 
+	public static String CommandLine = "";
+
 	public static boolean AppUsesMouse = false;
+	
+	public static boolean AppNeedsTwoButtonMouse = false;
 
 	public static boolean AppNeedsArrowKeys = true;
+
+	public static boolean AppNeedsTextInput = true;
 
 	public static boolean AppUsesJoystick = false;
 
@@ -39,20 +48,40 @@ class Globals {
 	public static int AppTouchscreenKeyboardKeysAmountAutoFire = 1;
 
 	// Phone-specific config
-	// It will download app data to /sdcard/alienblaster if set to true,
-	// otherwise it will download it to /data/data/de.schwardtnet.alienblaster/files
-	public static boolean DownloadToSdcard = false;
+	public static boolean DownloadToSdcard = true;
 	public static boolean PhoneHasTrackball = false;
 	public static boolean PhoneHasArrowKeys = false;
 	public static boolean UseAccelerometerAsArrowKeys = false;
-	public static boolean UseTouchscreenKeyboard = false;
+	public static boolean UseTouchscreenKeyboard = true;
 	public static int TouchscreenKeyboardSize = 0;
-	public static int TouchscreenKeyboardTheme = 0;
-	public static int AccelerometerSensitivity = 0;
-	public static int AccelerometerCenterPos = 0;
+	public static int TouchscreenKeyboardTheme = 1;
+	public static int AccelerometerSensitivity = 2;
+	public static int AccelerometerCenterPos = 2;
 	public static int TrackballDampening = 0;
 	public static int AudioBufferConfig = 0;
 	public static boolean OptionalDataDownload[] = null;
+	public static final int LEFT_CLICK_NORMAL = 0;
+	public static final int LEFT_CLICK_NEAR_CURSOR = 1;
+	public static final int LEFT_CLICK_WITH_MULTITOUCH = 2;
+	public static final int LEFT_CLICK_WITH_PRESSURE = 3;
+	public static final int LEFT_CLICK_WITH_DPAD = 4;
+	public static int LeftClickMethod = LEFT_CLICK_NORMAL;
+	public static final int RIGHT_CLICK_NONE = 0;
+	public static final int RIGHT_CLICK_WITH_MULTITOUCH = 1;
+	public static final int RIGHT_CLICK_WITH_PRESSURE = 2;
+	public static final int RIGHT_CLICK_WITH_MENU_BUTTON = 3;
+	public static int RightClickMethod = RIGHT_CLICK_NONE;
+	public static boolean MoveMouseWithJoystick = false;
+	public static int MoveMouseWithJoystickSpeed = 0;
+	public static int MoveMouseWithJoystickAccel = 0;
+	public static boolean ClickMouseWithDpad = false;
+	public static boolean ShowScreenUnderFinger = false;
+	public static boolean KeepAspectRatio = false;
+	public static int ClickScreenPressure = 0;
+	public static int ClickScreenTouchspotSize = 0;
+	public static int RemapHwKeycode[] = new int[SDL_Keys.JAVA_KEYCODE_LAST];
+	public static int RemapScreenKbKeycode[] = new int[10];
+	public static boolean ScreenKbControlsShown[] = new boolean[12];
 }
 
 class LoadLibrary {

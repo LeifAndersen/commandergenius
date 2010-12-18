@@ -1,6 +1,6 @@
 #!/bin/sh                            
 
-CHANGE_APP_SETTINGS_VERSION=12
+CHANGE_APP_SETTINGS_VERSION=16
 AUTO=
 
 if [ "X$1" = "X-a" ]; then
@@ -12,9 +12,9 @@ fi
 
 . ./AndroidAppSettings.cfg
 
-if [ "$CHANGE_APP_SETTINGS_VERSION" != "$AppSettingVersion" ]; then
-	AUTO=
-fi
+#if [ "$CHANGE_APP_SETTINGS_VERSION" != "$AppSettingVersion" ]; then
+#	AUTO=
+#fi
 
 var=""
 
@@ -102,10 +102,18 @@ fi
 fi
 
 if [ -z "$AppUsesMouse" -o -z "$AUTO" ]; then
-echo -n "\nApplication uses mouse, disables touchscreen keyboard currently (y) or (n) ($AppUsesMouse): "
+echo -n "\nApplication uses mouse (y) or (n) ($AppUsesMouse): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesMouse="$var"
+fi
+fi
+
+if [ -z "$AppNeedsTwoButtonMouse" -o -z "$AUTO" ]; then
+echo -n "\nApplication needs two-button mouse, will also enable advanced point-and-click features (y) or (n) ($AppNeedsTwoButtonMouse): "
+read var
+if [ -n "$var" ] ; then
+	AppNeedsTwoButtonMouse="$var"
 fi
 fi
 
@@ -114,6 +122,14 @@ echo -n "\nApplication needs arrow keys (y) or (n), if (y) the accelerometer or 
 read var
 if [ -n "$var" ] ; then
 	AppNeedsArrowKeys="$var"
+fi
+fi
+
+if [ -z "$AppNeedsTextInput" -o -z "$AUTO" ]; then
+echo -n "\nApplication needs text input (y) or (n), enables button for text input on screen ($AppNeedsTextInput): "
+read var
+if [ -n "$var" ] ; then
+	AppNeedsTextInput="$var"
 fi
 fi
 
@@ -160,9 +176,12 @@ fi
 fi
 
 if [ -z "$RedefinedKeys" -o -z "$AUTO" ]; then
-echo -n "\nRedefine common keys to SDL keysyms: TOUCHSCREEN SEARCH/CALL/DPAD_CENTER VOLUMEUP VOLUMEDOWN MENU BACK CAMERA ENTER DEL"
+echo -n "\nRedefine common keys to SDL keysyms"
 echo -n "\nMENU and BACK hardware keys and TOUCHSCREEN virtual 'key' are available on all devices, other keys may be absent"
-echo -n "\nThe same key values are used if touchscreen keyboard is enabled, except for MENU and BACK\n($RedefinedKeys)\n: "
+echo -n "\nSEARCH and CALL by default return same keycode as DPAD_CENTER - one of those keys is available on most devices"
+echo -n "\nTOUCHSCREEN DPAD_CENTER VOLUMEUP VOLUMEDOWN MENU BACK CAMERA ENTER DEL SEARCH CALL - Java keycodes"
+echo -n "\n$RedefinedKeys - current SDL keycodes"
+echo -n "\n: "
 read var
 if [ -n "$var" ] ; then
 	RedefinedKeys="$var"
@@ -182,6 +201,19 @@ echo -n "\nNumber of virtual keyboard keys that support autofire (currently 2 is
 read var
 if [ -n "$var" ] ; then
 	AppTouchscreenKeyboardKeysAmountAutoFire="$var"
+fi
+fi
+
+if [ -z "$RedefinedKeysScreenKb" -o -z "$AUTO" ]; then
+if [ -z "$RedefinedKeysScreenKb" ]; then
+	RedefinedKeysScreenKb="$RedefinedKeys"
+fi
+echo -n "\nRedefine on-screen keyboard keys to SDL keysyms - 6 keyboard keys + 4 multitouch gestures (zoom in/out and rotate left/right)"
+echo -n "\n$RedefinedKeysScreenKb - current SDL keycodes"
+echo -n "\n: "
+read var
+if [ -n "$var" ] ; then
+	RedefinedKeysScreenKb="$var"
 fi
 fi
 
@@ -237,7 +269,7 @@ fi
 fi
 
 if [ -z "$AUTO" ]; then
-echo -n "\nAditional LDFLAGS for application ($AppLdflags): "
+echo -n "\nAdditional LDFLAGS for application ($AppLdflags): "
 read var
 if [ -n "$var" ] ; then
 	AppLdflags="$var"
@@ -258,6 +290,14 @@ echo -n `which ndk-build | sed 's@/[^/]*/ndk-build@/android-ndk-r4-crystax@'` "(
 read var
 if [ -n "$var" ] ; then
 	AppUseCrystaXToolchain="$var"
+fi
+fi
+
+if [ -z "$AUTO" ]; then
+echo -n "\nApplication command line parameters, including app name as 0-th param ($AppCmdline): "
+read var
+if [ -n "$var" ] ; then
+	AppCmdline="$var"
 fi
 fi
 
@@ -296,7 +336,9 @@ echo SdlVideoResize=$SdlVideoResize >> AndroidAppSettings.cfg
 echo SdlVideoResizeKeepAspect=$SdlVideoResizeKeepAspect >> AndroidAppSettings.cfg
 echo NeedDepthBuffer=$NeedDepthBuffer >> AndroidAppSettings.cfg
 echo AppUsesMouse=$AppUsesMouse >> AndroidAppSettings.cfg
+echo AppNeedsTwoButtonMouse=$AppNeedsTwoButtonMouse >> AndroidAppSettings.cfg
 echo AppNeedsArrowKeys=$AppNeedsArrowKeys >> AndroidAppSettings.cfg
+echo AppNeedsTextInput=$AppNeedsTextInput >> AndroidAppSettings.cfg
 echo AppUsesJoystick=$AppUsesJoystick >> AndroidAppSettings.cfg
 echo AppHandlesJoystickSensitivity=$AppHandlesJoystickSensitivity >> AndroidAppSettings.cfg
 echo AppUsesMultitouch=$AppUsesMultitouch >> AndroidAppSettings.cfg
@@ -304,6 +346,7 @@ echo NonBlockingSwapBuffers=$NonBlockingSwapBuffers >> AndroidAppSettings.cfg
 echo RedefinedKeys=\"$RedefinedKeys\" >> AndroidAppSettings.cfg
 echo AppTouchscreenKeyboardKeysAmount=$AppTouchscreenKeyboardKeysAmount >> AndroidAppSettings.cfg
 echo AppTouchscreenKeyboardKeysAmountAutoFire=$AppTouchscreenKeyboardKeysAmountAutoFire >> AndroidAppSettings.cfg
+echo RedefinedKeysScreenKb=\"$RedefinedKeysScreenKb\" >> AndroidAppSettings.cfg
 echo MultiABI=$MultiABI >> AndroidAppSettings.cfg
 echo AppVersionCode=$AppVersionCode >> AndroidAppSettings.cfg
 echo AppVersionName=\"$AppVersionName\" >> AndroidAppSettings.cfg
@@ -313,6 +356,7 @@ echo AppCflags=\'$AppCflags\' >> AndroidAppSettings.cfg
 echo AppLdflags=\'$AppLdflags\' >> AndroidAppSettings.cfg
 echo AppSubdirsBuild=\'$AppSubdirsBuild\' >> AndroidAppSettings.cfg
 echo AppUseCrystaXToolchain=$AppUseCrystaXToolchain >> AndroidAppSettings.cfg
+echo AppCmdline=\'$AppCmdline\' >> AndroidAppSettings.cfg
 echo ReadmeText=\'$ReadmeText\' >> AndroidAppSettings.cfg
 
 AppShortName=`echo $AppName | sed 's/ //g'`
@@ -321,6 +365,11 @@ AppFullNameUnderscored=`echo $AppFullName | sed 's/[.]/_/g'`
 AppSharedLibrariesPath=/data/data/$AppFullName/lib
 ScreenOrientation1=portrait
 HorizontalOrientation=false
+
+UsingSdl13=false
+if [ "$LibSdlVersion" = "1.3" ] ; then
+	UsingSdl13=true
+fi
 
 if [ "$ScreenOrientation" = "h" ] ; then
 	ScreenOrientation1=landscape
@@ -353,20 +402,28 @@ else
 	NeedDepthBuffer=false
 fi
 
-MouseKeycode=UNKNOWN
 if [ "$AppUsesMouse" = "y" ] ; then
 	AppUsesMouse=true
-elif [ "$AppUsesMouse" = "n" ] ; then
-	AppUsesMouse=false
 else
-	MouseKeycode=$AppUsesMouse
 	AppUsesMouse=false
+fi
+
+if [ "$AppNeedsTwoButtonMouse" = "y" ] ; then
+	AppNeedsTwoButtonMouse=true
+else
+	AppNeedsTwoButtonMouse=false
 fi
 
 if [ "$AppNeedsArrowKeys" = "y" ] ; then
 	AppNeedsArrowKeys=true
 else
 	AppNeedsArrowKeys=false
+fi
+
+if [ "$AppNeedsTextInput" = "y" ] ; then
+	AppNeedsTextInput=true
+else
+	AppNeedsTextInput=false
 fi
 
 if [ "$AppUsesJoystick" = "y" ] ; then
@@ -393,10 +450,15 @@ else
 	NonBlockingSwapBuffers=false
 fi
 
-RedefinedKeycodes="-DSDL_ANDROID_KEYCODE_MOUSE=$MouseKeycode"
 KEY2=0
 for KEY in $RedefinedKeys; do
 	RedefinedKeycodes="$RedefinedKeycodes -DSDL_ANDROID_KEYCODE_$KEY2=$KEY"
+	KEY2=`expr $KEY2 '+' 1`
+done
+
+KEY2=0
+for KEY in $RedefinedKeysScreenKb; do
+	RedefinedKeycodesScreenKb="$RedefinedKeycodesScreenKb -DSDL_ANDROID_SCREENKB_KEYCODE_$KEY2=$KEY"
 	KEY2=`expr $KEY2 '+' 1`
 done
 
@@ -444,12 +506,15 @@ cd ../..
 echo Patching project/src/Globals.java
 cat project/src/Globals.java | \
 	sed "s/public static String ApplicationName = .*;/public static String ApplicationName = \"$AppShortName\";/" | \
+	sed "s/public static final boolean Using_SDL_1_3 = .*;/public static final boolean Using_SDL_1_3 = $UsingSdl13;/" | \
 	sed "s@public static String DataDownloadUrl = .*@public static String DataDownloadUrl = \"$AppDataDownloadUrl1\";@" | \
 	sed "s/public static boolean NeedDepthBuffer = .*;/public static boolean NeedDepthBuffer = $NeedDepthBuffer;/" | \
 	sed "s/public static boolean HorizontalOrientation = .*;/public static boolean HorizontalOrientation = $HorizontalOrientation;/" | \
 	sed "s/public static boolean InhibitSuspend = .*;/public static boolean InhibitSuspend = $InhibitSuspend;/" | \
 	sed "s/public static boolean AppUsesMouse = .*;/public static boolean AppUsesMouse = $AppUsesMouse;/" | \
+	sed "s/public static boolean AppNeedsTwoButtonMouse = .*;/public static boolean AppNeedsTwoButtonMouse = $AppNeedsTwoButtonMouse;/" | \
 	sed "s/public static boolean AppNeedsArrowKeys = .*;/public static boolean AppNeedsArrowKeys = $AppNeedsArrowKeys;/" | \
+	sed "s/public static boolean AppNeedsTextInput = .*;/public static boolean AppNeedsTextInput = $AppNeedsTextInput;/" | \
 	sed "s/public static boolean AppUsesJoystick = .*;/public static boolean AppUsesJoystick = $AppUsesJoystick;/" | \
 	sed "s/public static boolean AppHandlesJoystickSensitivity = .*;/public static boolean AppHandlesJoystickSensitivity = $AppHandlesJoystickSensitivity;/" | \
 	sed "s/public static boolean AppUsesMultitouch = .*;/public static boolean AppUsesMultitouch = $AppUsesMultitouch;/" | \
@@ -457,6 +522,7 @@ cat project/src/Globals.java | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmount = .*;/public static int AppTouchscreenKeyboardKeysAmount = $AppTouchscreenKeyboardKeysAmount;/" | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmountAutoFire = .*;/public static int AppTouchscreenKeyboardKeysAmountAutoFire = $AppTouchscreenKeyboardKeysAmountAutoFire;/" | \
 	sed "s%public static String ReadmeText = .*%public static String ReadmeText = \"$ReadmeText\".replace(\"^\",\"\\\n\");%" | \
+	sed "s%public static String CommandLine = .*%public static String CommandLine = \"$AppCmdline\";%" | \
 	sed "s/public LoadLibrary() .*/public LoadLibrary() { $LibrariesToLoad };/" > \
 	project/src/Globals.java.1
 mv -f project/src/Globals.java.1 project/src/Globals.java
@@ -473,7 +539,7 @@ cat project/jni/SettingsTemplate.mk | \
 	sed "s^COMPILED_LIBRARIES := .*^COMPILED_LIBRARIES := $CompiledLibraries^" | \
 	sed "s^APPLICATION_ADDITIONAL_CFLAGS :=.*^APPLICATION_ADDITIONAL_CFLAGS := $AppCflags^" | \
 	sed "s^APPLICATION_ADDITIONAL_LDFLAGS :=.*^APPLICATION_ADDITIONAL_LDFLAGS := $AppLdflags^" | \
-	sed "s^SDL_ADDITIONAL_CFLAGS :=.*^SDL_ADDITIONAL_CFLAGS := $RedefinedKeycodes^" | \
+	sed "s^SDL_ADDITIONAL_CFLAGS :=.*^SDL_ADDITIONAL_CFLAGS := $RedefinedKeycodes $RedefinedKeycodesScreenKb^" | \
 	sed "s^APPLICATION_SUBDIRS_BUILD :=.*^APPLICATION_SUBDIRS_BUILD := $AppSubdirsBuild^" | \
 	sed "s^APPLICATION_CUSTOM_BUILD_SCRIPT :=.*^APPLICATION_CUSTOM_BUILD_SCRIPT := $CustomBuildScript^" | \
 	sed "s^SDL_VERSION :=.*^SDL_VERSION := $LibSdlVersion^"  >> \
@@ -507,7 +573,9 @@ for LIB in freetype intl jpeg png lua mad stlport tremor xerces xml2; do
 	done
 done
 done
+rm -rf project/bin/classes
 
+mkdir -p project/assets
 rm -f project/assets/*
 if [ -d "project/jni/application/src/AndroidData" ] ; then
 	echo Copying asset files

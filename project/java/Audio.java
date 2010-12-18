@@ -20,12 +20,12 @@ import java.lang.Thread;
 
 class AudioThread {
 
-	private Activity mParent;
+	private MainActivity mParent;
 	private AudioTrack mAudio;
 	private byte[] mAudioBuffer;
 	private int mVirtualBufSize;
 
-	public AudioThread(Activity parent)
+	public AudioThread(MainActivity parent)
 	{
 		mParent = parent;
 		mAudio = null;
@@ -35,7 +35,20 @@ class AudioThread {
 	
 	public int fillBuffer()
 	{
-		mAudio.write( mAudioBuffer, 0, mVirtualBufSize );
+		if( mParent.isPaused() )
+		{
+			try{
+				Thread.sleep(200);
+			} catch (InterruptedException e) {}
+		}
+		else
+		{
+			//if( Globals.AudioBufferConfig == 0 ) // Gives too much spam to logcat, makes things worse
+			//	mAudio.flush();
+
+			mAudio.write( mAudioBuffer, 0, mVirtualBufSize );
+		}
+		
 		return 1;
 	}
 	
@@ -59,7 +72,7 @@ class AudioThread {
 					}
 					mAudioBuffer = new byte[bufSize];
 
-					mAudio = new AudioTrack(AudioManager.STREAM_RING,
+					mAudio = new AudioTrack(AudioManager.STREAM_MUSIC,
 												rate,
 												channels,
 												encoding,

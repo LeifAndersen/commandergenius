@@ -61,6 +61,11 @@ static void ANDROID_PumpEvents(_THIS);
 
 static int ANDROID_CreateWindow(_THIS, SDL_Window * window);
 static void ANDROID_DestroyWindow(_THIS, SDL_Window * window);
+static Uint32 SDL_VideoThreadID = 0;
+int SDL_ANDROID_InsideVideoThread()
+{
+	return SDL_VideoThreadID == SDL_ThreadID();
+}
 
 /* ANDROID driver bootstrap functions */
 
@@ -134,6 +139,8 @@ int ANDROID_VideoInit(_THIS)
 	display.current_mode = mode;
 	display.driverdata = NULL;
 	SDL_AddVideoDisplay(&display);
+	
+	SDL_VideoThreadID = SDL_ThreadID();
 
 	return 1;
 }
@@ -172,11 +179,13 @@ void ANDROID_VideoQuit(_THIS)
 
 void ANDROID_PumpEvents(_THIS)
 {
+	SDL_ANDROID_PumpEvents();
 }
 
 void ANDROID_GL_SwapBuffers(_THIS, SDL_Window * window)
 {
-	SDL_ANDROID_CallJavaSwapBuffers();
+	if( SDL_ANDROID_InsideVideoThread() )
+		SDL_ANDROID_CallJavaSwapBuffers();
 };
 
 SDL_GLContext ANDROID_GL_CreateContext(_THIS, SDL_Window * window)
@@ -190,7 +199,6 @@ int ANDROID_GL_MakeCurrent (_THIS, SDL_Window * window, SDL_GLContext context)
 void ANDROID_GL_DeleteContext (_THIS, SDL_GLContext context)
 {
 };
-
 
 SDL_Window * ANDROID_CurrentWindow = NULL;
 int ANDROID_CreateWindow(_THIS, SDL_Window * window)

@@ -1,0 +1,172 @@
+Index: src/video/sdl_v.cpp
+===================================================================
+--- src/video/sdl_v.cpp	(revision 21293)
++++ src/video/sdl_v.cpp	(working copy)
+@@ -485,6 +485,9 @@
+ 	SDL_CALL SDL_EnableUNICODE(1);
+ 
+ 	_draw_threaded = GetDriverParam(parm, "no_threads") == NULL && GetDriverParam(parm, "no_thread") == NULL;
++#ifdef ANDROID
++	_draw_threaded = false;
++#endif
+ 
+ 	return NULL;
+ }
+Index: src/sound/sdl_s.cpp
+===================================================================
+--- src/sound/sdl_s.cpp	(revision 21293)
++++ src/sound/sdl_s.cpp	(working copy)
+@@ -20,9 +20,16 @@
+ 
+ static FSoundDriver_SDL iFSoundDriver_SDL;
+ 
++#ifdef ANDROID
++extern void Android_MidiMixMusic(Sint16 *stream, int len);
++#endif
++
+ static void CDECL fill_sound_buffer(void *userdata, Uint8 *stream, int len)
+ {
+ 	MxMixSamples(stream, len / 4);
++#if defined(ANDROID) && defined(LIBTIMIDITY)
++	Android_MidiMixMusic((Sint16 *)stream, len / 2);
++#endif
+ }
+ 
+ const char *SoundDriver_SDL::Start(const char * const *parm)
+Index: src/music/libtimidity.cpp
+===================================================================
+--- src/music/libtimidity.cpp	(revision 21293)
++++ src/music/libtimidity.cpp	(working copy)
+@@ -23,10 +23,13 @@
+ #include <sys/stat.h>
+ #include <errno.h>
+ #include <timidity.h>
++#include <SDL.h>
++
+ #if defined(PSP)
+ #include <pspaudiolib.h>
+ #endif /* PSP */
+ 
++
+ enum MidiState {
+ 	MIDI_STOPPED = 0,
+ 	MIDI_PLAYING = 1,
+@@ -51,6 +54,24 @@
+ 	}
+ }
+ #endif /* PSP */
++#ifdef ANDROID
++#define MIN(X ,Y)  ((X) < (Y) ? (X) : (Y))
++void Android_MidiMixMusic(Sint16 *stream, int len)
++{
++	if (_midi.status == MIDI_PLAYING) {
++		Sint16 buf[16384];
++		while( len > 0 )
++		{
++			int minlen = MIN(sizeof(buf), len);
++			mid_song_read_wave(_midi.song, stream, MIN(sizeof(buf), len*2));
++			for( Uint16 i = 0; i < minlen; i++ )
++				stream[i] += buf[i];
++			stream += minlen;
++			len -= minlen;
++		}
++	}
++}
++#endif
+ 
+ static FMusicDriver_LibTimidity iFMusicDriver_LibTimidity;
+ 
+Index: src/os/unix/unix.cpp
+===================================================================
+--- src/os/unix/unix.cpp	(revision 21293)
++++ src/os/unix/unix.cpp	(working copy)
+@@ -24,7 +24,7 @@
+ 
+ #ifdef __APPLE__
+ 	#include <sys/mount.h>
+-#elif (defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112L) || defined(__GLIBC__)
++#elif ((defined(_POSIX_VERSION) && _POSIX_VERSION >= 200112L) || defined(__GLIBC__)) && !defined(ANDROID)
+ 	#define HAS_STATVFS
+ #endif
+ 
+@@ -239,6 +239,11 @@
+ void cocoaReleaseAutoreleasePool();
+ #endif
+ 
++#ifdef ANDROID
++#define main SDL_main
++extern "C" int CDECL main(int, char *[]);
++#endif
++
+ int CDECL main(int argc, char *argv[])
+ {
+ 	int ret;
+Index: src/os/unix/crashlog_unix.cpp
+===================================================================
+--- src/os/unix/crashlog_unix.cpp	(revision 21293)
++++ src/os/unix/crashlog_unix.cpp	(working copy)
+@@ -141,7 +141,11 @@
+ };
+ 
+ /** The signals we want our crash handler to handle. */
++#ifdef ANDROID
++static const int _signals_to_handle[] = { }; // Default Android signal handler will give us stack trace
++#else
+ static const int _signals_to_handle[] = { SIGSEGV, SIGABRT, SIGFPE, SIGBUS, SIGILL };
++#endif
+ 
+ /**
+  * Entry point for the crash handler.
+Index: src/network/core/os_abstraction.h
+===================================================================
+--- src/network/core/os_abstraction.h	(revision 21293)
++++ src/network/core/os_abstraction.h	(working copy)
+@@ -159,7 +159,7 @@
+ #		include <net/if.h>
+ /* According to glibc/NEWS, <ifaddrs.h> appeared in glibc-2.3. */
+ #		if !defined(__sgi__) && !defined(SUNOS) && !defined(__MORPHOS__) && !defined(__BEOS__) && !defined(__HAIKU__) && !defined(__INNOTEK_LIBC__) \
+-		   && !(defined(__GLIBC__) && (__GLIBC__ <= 2) && (__GLIBC_MINOR__ <= 2)) && !defined(__dietlibc__) && !defined(HPUX)
++		   && !(defined(__GLIBC__) && (__GLIBC__ <= 2) && (__GLIBC_MINOR__ <= 2)) && !defined(__dietlibc__) && !defined(HPUX) && !defined(ANDROID)
+ /* If for any reason ifaddrs.h does not exist on your system, comment out
+  *   the following two lines and an alternative way will be used to fetch
+  *   the list of IPs from the system. */
+Index: src/debug.cpp
+===================================================================
+--- src/debug.cpp	(revision 21293)
++++ src/debug.cpp	(working copy)
+@@ -16,6 +16,9 @@
+ #include "string_func.h"
+ #include "fileio_func.h"
+ #include "settings_type.h"
++#ifdef ANDROID
++#include <android/log.h>
++#endif
+ 
+ #include <time.h>
+ 
+@@ -70,6 +73,9 @@
+ 
+ static void debug_print(const char *dbg, const char *buf)
+ {
++#ifdef ANDROID
++	__android_log_print(ANDROID_LOG_INFO, "OpenTTD", "[%s] %s", dbg, buf);
++#endif
+ #if defined(ENABLE_NETWORK)
+ 	if (_debug_socket != INVALID_SOCKET) {
+ 		char buf2[1024 + 32];
+Index: src/main_gui.cpp
+===================================================================
+--- src/main_gui.cpp	(revision 21293)
++++ src/main_gui.cpp	(working copy)
+@@ -275,7 +275,11 @@
+ 			}
+ 
+ 			case WKC_ESC: ResetObjectToPlace(); break;
++#ifdef ANDROID
++			case WKC_DELETE: DeleteAllNonVitalWindows(); break;
++#else
+ 			case WKC_DELETE: DeleteNonVitalWindows(); break;
++#endif
+ 			case WKC_DELETE | WKC_SHIFT: DeleteAllNonVitalWindows(); break;
+ 			case 'R' | WKC_CTRL: MarkWholeScreenDirty(); break;
+ 
