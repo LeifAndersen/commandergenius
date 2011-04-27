@@ -52,7 +52,7 @@ enum {
 	SDL_ANDROID_SCREENKEYBOARD_BUTTON_NUM
 };
 
-/* All functions return 0 on failure and 1 on success */
+/* All functions return 0 on failure and 1 on success, contrary to other SDL API */
 
 extern DECLSPEC int SDLCALL SDL_ANDROID_SetScreenKeyboardButtonPos(int buttonId, SDL_Rect * pos);
 extern DECLSPEC int SDLCALL SDL_ANDROID_GetScreenKeyboardButtonPos(int buttonId, SDL_Rect * pos);
@@ -70,8 +70,17 @@ extern DECLSPEC int SDLCALL SDL_ANDROID_GetScreenKeyboardShown();
 
 extern DECLSPEC int SDLCALL SDL_ANDROID_GetScreenKeyboardSize();
 
-/* Show Android on-screen keyboard, and pass entered text back to application when user closes it */
-extern DECLSPEC int SDLCALL SDL_ANDROID_ToggleScreenKeyboardTextInput();
+/* Show Android on-screen keyboard, and pass entered text back to application as SDL keypress events,
+previousText is UTF-8 encoded, it may be NULL, only 256 first bytes will be used, and this call will not block */
+extern DECLSPEC int SDLCALL SDL_ANDROID_ToggleScreenKeyboardTextInput(const char * previousText);
+
+/* Show Android on-screen keyboard, and pass entered text back to application in a buffer,
+using buffer contents as previous text (UTF-8 encoded), the buffer may be of any size -
+this call will block until user typed all text */
+extern DECLSPEC int SDLCALL SDL_ANDROID_GetScreenKeyboardTextInput(char * textBuf, int textBufSize);
+
+/* Whether user redefined on-screen keyboard layout via SDL menu, app should not enforce it's own layout in that case */
+extern DECLSPEC int SDLCALL SDL_ANDROID_GetScreenKeyboardRedefinedByUser();
 
 #ifdef __cplusplus
 }

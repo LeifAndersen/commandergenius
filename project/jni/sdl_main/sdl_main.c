@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <jni.h>
 #include <android/log.h>
+#include "SDL_version.h"
 #include "SDL_thread.h"
 #include "SDL_main.h"
 
@@ -24,41 +25,41 @@
 #define JAVA_EXPORT_NAME1(name,package) JAVA_EXPORT_NAME2(name,package)
 #define JAVA_EXPORT_NAME(name) JAVA_EXPORT_NAME1(name,SDL_JAVA_PACKAGE_PATH)
 
+static int argc = 0;
+static char ** argv = NULL;
 
-static int isSdcardUsed = 0;
+#if SDL_VERSION_ATLEAST(1,3,0)
+#else
+extern void SDL_ANDROID_MultiThreadedVideoLoopInit();
+extern void SDL_ANDROID_MultiThreadedVideoLoop();
+
+static int threadedMain(void * unused)
+{
+	SDL_main( argc, argv );
+	__android_log_print(ANDROID_LOG_INFO, "libSDL", "Application closed, calling exit(0)");
+	exit(0);
+}
+#endif
 
 extern C_LINKAGE void
-JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz, jstring jcurdir, jstring cmdline )
+JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz, jstring jcurdir, jstring cmdline, jint multiThreadedVideo )
 {
 	int i = 0;
 	char curdir[PATH_MAX] = "";
-	char realcurdir[PATH_MAX] = "";
 	const jbyte *jstr;
 	const char * str = "sdl";
-	int argc = 0;
-	char ** argv = NULL;
 
-	if( isSdcardUsed )
-	{
-		strcpy(curdir, "/sdcard/app-data/");
-		strcat(curdir, SDL_CURDIR_PATH);
-	}
-	else
-	{
-		strcpy(curdir, "/data/data/");
-		strcat(curdir, SDL_CURDIR_PATH);
-		strcat(curdir, "/files");
-	}
+	strcpy(curdir, "/sdcard/app-data/");
+	strcat(curdir, SDL_CURDIR_PATH);
 
 	jstr = (*env)->GetStringUTFChars(env, jcurdir, NULL);
 	if (jstr != NULL && strlen(jstr) > 0)
 		strcpy(curdir, jstr);
 	(*env)->ReleaseStringUTFChars(env, jcurdir, jstr);
 
-	if( realpath(curdir, realcurdir) == NULL )
-		strcpy(realcurdir, curdir);
-	chdir(realcurdir);
-	setenv("HOME", realcurdir, 1);
+	chdir(curdir);
+	setenv("HOME", curdir, 1);
+	__android_log_print(ANDROID_LOG_INFO, "libSDL", "Changing curdir to \"%s\"", curdir);
 
 	jstr = (*env)->GetStringUTFChars(env, cmdline, NULL);
 
@@ -99,16 +100,20 @@ JAVA_EXPORT_NAME(DemoRenderer_nativeInit) ( JNIEnv*  env, jobject thiz, jstring 
 
 	for( i = 0; i < argc; i++ )
 		__android_log_print(ANDROID_LOG_INFO, "libSDL", "param %d = \"%s\"", i, argv[i]);
-	
-	main( argc, argv );
 
+#if SDL_VERSION_ATLEAST(1,3,0)
+	SDL_main( argc, argv );
+#else
+	if( ! multiThreadedVideo )
+		SDL_main( argc, argv );
+	else
+	{
+		SDL_ANDROID_MultiThreadedVideoLoopInit();
+		SDL_CreateThread(threadedMain, NULL);
+		SDL_ANDROID_MultiThreadedVideoLoop();
+	}
+#endif
 };
-
-extern C_LINKAGE void
-JAVA_EXPORT_NAME(Settings_nativeIsSdcardUsed) ( JNIEnv*  env, jobject thiz, jint flag )
-{
-	isSdcardUsed = flag;
-}
 
 extern C_LINKAGE void
 JAVA_EXPORT_NAME(Settings_nativeSetEnv) ( JNIEnv*  env, jobject thiz, jstring j_name, jstring j_value )
@@ -120,10 +125,5 @@ JAVA_EXPORT_NAME(Settings_nativeSetEnv) ( JNIEnv*  env, jobject thiz, jstring j_
     (*env)->ReleaseStringUTFChars(env, j_name, name);
     (*env)->ReleaseStringUTFChars(env, j_value, value);
 }
-
-#undef JAVA_EXPORT_NAME
-#undef JAVA_EXPORT_NAME1
-#undef JAVA_EXPORT_NAME2
-#undef C_LINKAGE
 
 #endif

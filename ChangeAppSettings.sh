@@ -1,6 +1,6 @@
-#!/bin/sh                            
+#!/bin/sh
 
-CHANGE_APP_SETTINGS_VERSION=16
+CHANGE_APP_SETTINGS_VERSION=17
 AUTO=
 
 if [ "X$1" = "X-a" ]; then
@@ -18,10 +18,14 @@ fi
 
 var=""
 
-echo -n "\n===== libSDL on Android configuration =====\n\nIf you will supply empty string as answer the previous value will be used\n"
+echo
+echo "===== libSDL on Android configuration ====="
+echo
+echo "If you will supply empty string as answer the previous value will be used"
 
 if [ -z "$LibSdlVersion" -o -z "$AUTO" ]; then
-echo -n "\nlibSDL version to use (1.2 or 1.3) ($LibSdlVersion): "
+echo
+echo -n "libSDL version to use (1.2 or 1.3) ($LibSdlVersion): "
 read var
 if [ -n "$var" ] ; then
 	LibSdlVersion="$var"
@@ -29,7 +33,8 @@ fi
 fi
 
 if [ -z "$AppName" -o -z "$AUTO" ]; then
-echo -n "\nSpecify application name (e.x. My Application) ($AppName): "
+echo
+echo -n "Specify application name (e.x. My Application) ($AppName): "
 read var
 if [ -n "$var" ] ; then
 	AppName="$var"
@@ -37,7 +42,8 @@ fi
 fi
 
 if [ -z "$AppFullName" -o -z "$AUTO" ]; then
-echo -n "\nSpecify reversed site name of application (e.x. com.mysite.myapp) ($AppFullName): "
+echo
+echo -n "Specify reversed site name of application (e.x. com.mysite.myapp) ($AppFullName): "
 read var
 if [ -n "$var" ] ; then
 	AppFullName="$var"
@@ -45,7 +51,8 @@ fi
 fi
 
 if [ -z "$ScreenOrientation" -o -z "$AUTO" ]; then
-echo -n "\nSpecify screen orientation: (v)ertical or (h)orizontal ($ScreenOrientation): "
+echo
+echo -n "Specify screen orientation: (v)ertical or (h)orizontal ($ScreenOrientation): "
 read var
 if [ -n "$var" ] ; then
 	ScreenOrientation="$var"
@@ -53,11 +60,16 @@ fi
 fi
 
 if [ -z "$AppDataDownloadUrl" -o -z "$AUTO" ]; then
-echo -n "\nSpecify path to download application data in zip archive in the form 'Description|URL|MirrorURL|...'"
-echo -n "\nYou may specify additional paths to optional game content delimited by newlines (empty line to finish)"
-echo -n "\nIf the URL in in the form ':dir/file.dat:http://URL/' it will be downloaded as-is to game dir and not unzipped"
-echo -n "\nIf the URL does not contain 'http://' it is treated as file in 'project/jni/application/src/AndroidData' dir\n\n"
-echo -n "`echo $AppDataDownloadUrl | tr '^' '\\n'`"
+echo
+echo "Specify path to download application data in zip archive in the form 'Description|URL|MirrorURL|...'"
+echo "You may specify additional paths to additional downloads delimited by newlines (empty line to finish)"
+echo "If you'll start Description with '!' symbol it will be enabled by default, other downloads should be selected by user from config menu"
+echo "If the URL in in the form ':dir/file.dat:http://URL/' it will be downloaded as-is to the application dir and not unzipped"
+echo "If the URL does not contain 'http://' it is treated as file from 'project/jni/application/src/AndroidData' dir -"
+echo "these files are put inside .apk package by build system"
+echo "Also please avoid 'https://' URLs, many Android devices do not have trust certificates and will fail to connect to SF.net over HTTPS"
+echo " "
+echo "`echo $AppDataDownloadUrl | tr '^' '\\n'`"
 echo
 AppDataDownloadUrl1=""
 while true; do
@@ -78,7 +90,8 @@ fi
 fi
 
 if [ -z "$SdlVideoResize" -o -z "$AUTO" ]; then
-echo -n "\nApplication window should be resized to fit into native device screen (480x320 or 800x480) (y) or (n) ($SdlVideoResize): "
+echo
+echo "Application window should be resized to fit into native device screen (480x320 or 800x480) (y) or (n) ($SdlVideoResize): "
 read var
 if [ -n "$var" ] ; then
 	SdlVideoResize="$var"
@@ -86,7 +99,8 @@ fi
 fi
 
 if [ -z "$SdlVideoResizeKeepAspect" -o -z "$AUTO" ]; then
-echo -n "\nApplication resizing should use 4:3 aspect ratio, creating black bars (y) or (n) ($SdlVideoResizeKeepAspect): "
+echo
+echo -n "Application resizing should use 4:3 aspect ratio, creating black bars (y) or (n) ($SdlVideoResizeKeepAspect): "
 read var
 if [ -n "$var" ] ; then
 	SdlVideoResizeKeepAspect="$var"
@@ -94,15 +108,31 @@ fi
 fi
 
 if [ -z "$NeedDepthBuffer" -o -z "$AUTO" ]; then
-echo -n "\nEnable OpenGL depth buffer (needed only for 3-d applications, small speed decrease) (y) or (n) ($NeedDepthBuffer): "
+echo
+echo -n "Enable OpenGL depth buffer (needed only for 3-d applications, small speed decrease) (y) or (n) ($NeedDepthBuffer): "
 read var
 if [ -n "$var" ] ; then
 	NeedDepthBuffer="$var"
 fi
 fi
 
+if [ "$LibSdlVersion" = "1.2" ]; then
+	if [ -z "$SwVideoMode" -o -z "$AUTO" ]; then
+	echo
+	echo "Application uses software video buffer - you're calling SDL_SetVideoMode() without SDL_HWSURFACE and without SDL_OPENGL,"
+	echo -n "this will allow small speed optimization (y) or (n) ($SwVideoMode): "
+	read var
+	if [ -n "$var" ] ; then
+		SwVideoMode="$var"
+	fi
+	fi
+else
+	SwVideoMode=n
+fi
+
 if [ -z "$AppUsesMouse" -o -z "$AUTO" ]; then
-echo -n "\nApplication uses mouse (y) or (n) ($AppUsesMouse): "
+echo
+echo -n "Application uses mouse (y) or (n) ($AppUsesMouse): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesMouse="$var"
@@ -110,7 +140,8 @@ fi
 fi
 
 if [ -z "$AppNeedsTwoButtonMouse" -o -z "$AUTO" ]; then
-echo -n "\nApplication needs two-button mouse, will also enable advanced point-and-click features (y) or (n) ($AppNeedsTwoButtonMouse): "
+echo
+echo -n "Application needs two-button mouse, will also enable advanced point-and-click features (y) or (n) ($AppNeedsTwoButtonMouse): "
 read var
 if [ -n "$var" ] ; then
 	AppNeedsTwoButtonMouse="$var"
@@ -118,7 +149,9 @@ fi
 fi
 
 if [ -z "$AppNeedsArrowKeys" -o -z "$AUTO" ]; then
-echo -n "\nApplication needs arrow keys (y) or (n), if (y) the accelerometer or touchscreen keyboard\nwill be used as arrow keys if phone does not have dpad/trackball ($AppNeedsArrowKeys): "
+echo
+echo "Application needs arrow keys (y) or (n), if (y) the accelerometer or touchscreen keyboard"
+echo -n "will be used as arrow keys if phone does not have dpad/trackball ($AppNeedsArrowKeys): "
 read var
 if [ -n "$var" ] ; then
 	AppNeedsArrowKeys="$var"
@@ -126,7 +159,8 @@ fi
 fi
 
 if [ -z "$AppNeedsTextInput" -o -z "$AUTO" ]; then
-echo -n "\nApplication needs text input (y) or (n), enables button for text input on screen ($AppNeedsTextInput): "
+echo
+echo -n "Application needs text input (y) or (n), enables button for text input on screen ($AppNeedsTextInput): "
 read var
 if [ -n "$var" ] ; then
 	AppNeedsTextInput="$var"
@@ -134,7 +168,10 @@ fi
 fi
 
 if [ -z "$AppUsesJoystick" -o -z "$AUTO" ]; then
-echo -n "\nApplication uses joystick (y) or (n), the accelerometer (2-axis) or orientation sensor (3-axis)\nwill be used as joystick 0, also on-screen DPAD will be used as joystick -\nmake sure you can navigate all app menus with joystick or mouse ($AppUsesJoystick): "
+echo
+echo "Application uses joystick (y) or (n), the accelerometer (2-axis) or orientation sensor (3-axis)"
+echo "will be used as joystick 0, also on-screen DPAD will be used as joystick -"
+echo -n "make sure you can navigate all app menus with joystick or mouse ($AppUsesJoystick): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesJoystick="$var"
@@ -142,7 +179,9 @@ fi
 fi
 
 if [ -z "$AppHandlesJoystickSensitivity" -o -z "$AUTO" ]; then
-echo -n "\nApplication will handle joystick center and sensitivity itself, \nSDL will send raw accelerometer data and won't show 'Accelerometer sensitivity' dialog (y) or (n) ($AppHandlesJoystickSensitivity): "
+echo
+echo "Application will handle joystick center and sensitivity itself, "
+echo -n "SDL will send raw accelerometer data and won't show 'Accelerometer sensitivity' dialog (y) or (n) ($AppHandlesJoystickSensitivity): "
 read var
 if [ -n "$var" ] ; then
 	AppHandlesJoystickSensitivity="$var"
@@ -150,7 +189,9 @@ fi
 fi
 
 if [ -z "$AppUsesMultitouch" -o -z "$AUTO" ]; then
-echo -n "\nApplication uses multitouch (y) or (n), multitouch events are passed as 4-axis joysticks 1-5, with pressure and size,\nor additionally as SDL_FINGERDOWN/UP/MOTION events in SDL 1.3, with SDL pressure = Android pressure * Andorid touchspot size ($AppUsesMultitouch): "
+echo
+echo "Application uses multitouch (y) or (n), multitouch events are passed as 4-axis joysticks 1-5, with pressure and size,"
+echo -n "or additionally as SDL_FINGERDOWN/UP/MOTION events in SDL 1.3, with SDL pressure = Android pressure * Andorid touchspot size ($AppUsesMultitouch): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesMultitouch="$var"
@@ -158,8 +199,9 @@ fi
 fi
 
 if [ -z "$NonBlockingSwapBuffers" -o -z "$AUTO" ]; then
-echo -n "\nApplication implements Android-specific routines to put to background, and will not draw anything to screen\n"
-echo -n "between SDL_ACTIVEEVENT->SDL_APPACTIVE lost / gained notifications - you should check for them\n"
+echo
+echo "Application implements Android-specific routines to put to background, and will not draw anything to screen"
+echo "between SDL_ACTIVEEVENT lost / gained notifications - you should check for them"
 echo -n "rigth after SDL_Flip(), if (n) then SDL_Flip() will block till app in background (y) or (n) ($NonBlockingSwapBuffers): "
 read var
 if [ -n "$var" ] ; then
@@ -168,7 +210,9 @@ fi
 fi
 
 if [ -z "$InhibitSuspend" -o -z "$AUTO" ]; then
-echo -n "\nPrevent device from going to sleep while application is running (y) or (n) - this setting is\napplied automatically if you're using accelerometer, but may be useful for video players etc ($InhibitSuspend): "
+echo
+echo "Prevent device from going to sleep while application is running (y) or (n) - this setting is"
+echo -n "applied automatically if you're using accelerometer, but may be useful for video players etc ($InhibitSuspend): "
 read var
 if [ -n "$var" ] ; then
 	InhibitSuspend="$var"
@@ -176,12 +220,13 @@ fi
 fi
 
 if [ -z "$RedefinedKeys" -o -z "$AUTO" ]; then
-echo -n "\nRedefine common keys to SDL keysyms"
-echo -n "\nMENU and BACK hardware keys and TOUCHSCREEN virtual 'key' are available on all devices, other keys may be absent"
-echo -n "\nSEARCH and CALL by default return same keycode as DPAD_CENTER - one of those keys is available on most devices"
-echo -n "\nTOUCHSCREEN DPAD_CENTER VOLUMEUP VOLUMEDOWN MENU BACK CAMERA ENTER DEL SEARCH CALL - Java keycodes"
-echo -n "\n$RedefinedKeys - current SDL keycodes"
-echo -n "\n: "
+echo
+echo "Redefine common keys to SDL keysyms"
+echo "MENU and BACK hardware keys and TOUCHSCREEN virtual 'key' are available on all devices, other keys may be absent"
+echo "SEARCH and CALL by default return same keycode as DPAD_CENTER - one of those keys is available on most devices"
+echo "TOUCHSCREEN DPAD_CENTER VOLUMEUP VOLUMEDOWN MENU BACK CAMERA ENTER DEL SEARCH CALL - Java keycodes"
+echo "$RedefinedKeys - current SDL keycodes"
+echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	RedefinedKeys="$var"
@@ -189,7 +234,8 @@ fi
 fi
 
 if [ -z "$AppTouchscreenKeyboardKeysAmount" -o -z "$AUTO" ]; then
-echo -n "\nNumber of virtual keyboard keys (currently 7 is maximum) ($AppTouchscreenKeyboardKeysAmount): "
+echo
+echo -n "Number of virtual keyboard keys (currently 7 is maximum) ($AppTouchscreenKeyboardKeysAmount): "
 read var
 if [ -n "$var" ] ; then
 	AppTouchscreenKeyboardKeysAmount="$var"
@@ -197,7 +243,8 @@ fi
 fi
 
 if [ -z "$AppTouchscreenKeyboardKeysAmountAutoFire" -o -z "$AUTO" ]; then
-echo -n "\nNumber of virtual keyboard keys that support autofire (currently 2 is maximum) ($AppTouchscreenKeyboardKeysAmountAutoFire): "
+echo
+echo -n "Number of virtual keyboard keys that support autofire (currently 2 is maximum) ($AppTouchscreenKeyboardKeysAmountAutoFire): "
 read var
 if [ -n "$var" ] ; then
 	AppTouchscreenKeyboardKeysAmountAutoFire="$var"
@@ -208,9 +255,10 @@ if [ -z "$RedefinedKeysScreenKb" -o -z "$AUTO" ]; then
 if [ -z "$RedefinedKeysScreenKb" ]; then
 	RedefinedKeysScreenKb="$RedefinedKeys"
 fi
-echo -n "\nRedefine on-screen keyboard keys to SDL keysyms - 6 keyboard keys + 4 multitouch gestures (zoom in/out and rotate left/right)"
-echo -n "\n$RedefinedKeysScreenKb - current SDL keycodes"
-echo -n "\n: "
+echo
+echo "Redefine on-screen keyboard keys to SDL keysyms - 6 keyboard keys + 4 multitouch gestures (zoom in/out and rotate left/right)"
+echo "$RedefinedKeysScreenKb - current SDL keycodes"
+echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	RedefinedKeysScreenKb="$var"
@@ -218,7 +266,9 @@ fi
 fi
 
 if [ -z "$MultiABI" -o -z "$AUTO" ]; then
-echo -n "\nEnable multi-ABI binary, with hardware FPU support - \nit will also work on old devices, but .apk size is 2x bigger (y) or (n) ($MultiABI): "
+echo
+echo "Enable multi-ABI binary, with hardware FPU support - "
+echo -n "it will also work on old devices, but .apk size is 2x bigger (y) or (n) ($MultiABI): "
 read var
 if [ -n "$var" ] ; then
 	MultiABI="$var"
@@ -226,7 +276,8 @@ fi
 fi
 
 if [ -z "$AppVersionCode" -o "-$AUTO" != "-a" ]; then
-echo -n "\nApplication version code (integer) ($AppVersionCode): "
+echo
+echo -n "Application version code (integer) ($AppVersionCode): "
 read var
 if [ -n "$var" ] ; then
 	AppVersionCode="$var"
@@ -234,7 +285,8 @@ fi
 fi
 
 if [ -z "$AppVersionName" -o "-$AUTO" != "-a" ]; then
-echo -n "\nApplication user-visible version name (string) ($AppVersionName): "
+echo
+echo -n "Application user-visible version name (string) ($AppVersionName): "
 read var
 if [ -n "$var" ] ; then
 	AppVersionName="$var"
@@ -242,7 +294,8 @@ fi
 fi
 
 if [ -z "$CustomBuildScript" -o -z "$AUTO" ]; then
-echo -n "\nApplication uses custom build script AndroidBuild.sh instead of Android.mk (y) or (n) ($CustomBuildScript): "
+echo
+echo -n "Application uses custom build script AndroidBuild.sh instead of Android.mk (y) or (n) ($CustomBuildScript): "
 read var
 if [ -n "$var" ] ; then
 	CustomBuildScript="$var"
@@ -250,7 +303,8 @@ fi
 fi
 
 if [ -z "$AUTO" ]; then
-echo -n "\nAditional CFLAGS for application ($AppCflags): "
+echo
+echo -n "Aditional CFLAGS for application ($AppCflags): "
 read var
 if [ -n "$var" ] ; then
 	AppCflags="$var"
@@ -258,10 +312,13 @@ fi
 fi
 
 if [ -z "$AUTO" ]; then
-echo -n "\nOptional shared libraries to compile - removing some of them will save space\nMP3 support by libMAD is encumbered by patents and libMAD is GPL-ed\n"
+echo
+echo "Optional shared libraries to compile - removing some of them will save space"
+echo "MP3 support by libMAD is encumbered by patents and libMAD is GPL-ed"
 grep 'Available' project/jni/SettingsTemplate.mk 
 grep 'depends on' project/jni/SettingsTemplate.mk
-echo -n "Current: $CompiledLibraries\n\n: "
+echo "Current: $CompiledLibraries"
+echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	CompiledLibraries="$var"
@@ -269,7 +326,8 @@ fi
 fi
 
 if [ -z "$AUTO" ]; then
-echo -n "\nAdditional LDFLAGS for application ($AppLdflags): "
+echo
+echo -n "Additional LDFLAGS for application ($AppLdflags): "
 read var
 if [ -n "$var" ] ; then
 	AppLdflags="$var"
@@ -277,24 +335,17 @@ fi
 fi
 
 if [ -z "$AUTO" ]; then
-echo -n "\nBuild only following subdirs (empty will build all dirs, ignored with custom script) ($AppSubdirsBuild): "
+echo
+echo -n "Build only following subdirs (empty will build all dirs, ignored with custom script) ($AppSubdirsBuild): "
 read var
 if [ -n "$var" ] ; then
 	AppSubdirsBuild="$var"
 fi
 fi
 
-if [ -z "$AppUseCrystaXToolchain" -o -z "$AUTO" ]; then
-echo -n "\nApplication requires C++ RTTI and exceptions - you will need CrystaX toolchain installed at\n"
-echo -n `which ndk-build | sed 's@/[^/]*/ndk-build@/android-ndk-r4-crystax@'` "(y) or (n) ($AppUseCrystaXToolchain): "
-read var
-if [ -n "$var" ] ; then
-	AppUseCrystaXToolchain="$var"
-fi
-fi
-
 if [ -z "$AUTO" ]; then
-echo -n "\nApplication command line parameters, including app name as 0-th param ($AppCmdline): "
+echo
+echo -n "Application command line parameters, including app name as 0-th param ($AppCmdline): "
 read var
 if [ -n "$var" ] ; then
 	AppCmdline="$var"
@@ -302,10 +353,14 @@ fi
 fi
 
 if [ -z "$ReadmeText" -o -z "$AUTO" ]; then
-echo -n "\nHere you may type some short readme text that will be shown when app data is downloaded."
-echo -n "\nCurrent text:\n"
-echo -n "`echo $ReadmeText | tr '^' '\\n'`"
-echo -n "\n\nNew text (empty line to finish):\n\n"
+echo
+echo "Here you may type some short readme text - it is currently not used anywhere"
+echo "Current text:"
+echo
+echo "`echo $ReadmeText | tr '^' '\\n'`"
+echo
+echo "New text (empty line to finish):"
+echo
 
 ReadmeText1=""
 while true; do
@@ -335,6 +390,7 @@ echo AppDataDownloadUrl=\"$AppDataDownloadUrl\" >> AndroidAppSettings.cfg
 echo SdlVideoResize=$SdlVideoResize >> AndroidAppSettings.cfg
 echo SdlVideoResizeKeepAspect=$SdlVideoResizeKeepAspect >> AndroidAppSettings.cfg
 echo NeedDepthBuffer=$NeedDepthBuffer >> AndroidAppSettings.cfg
+echo SwVideoMode=$SwVideoMode >> AndroidAppSettings.cfg
 echo AppUsesMouse=$AppUsesMouse >> AndroidAppSettings.cfg
 echo AppNeedsTwoButtonMouse=$AppNeedsTwoButtonMouse >> AndroidAppSettings.cfg
 echo AppNeedsArrowKeys=$AppNeedsArrowKeys >> AndroidAppSettings.cfg
@@ -355,7 +411,6 @@ echo CustomBuildScript=$CustomBuildScript >> AndroidAppSettings.cfg
 echo AppCflags=\'$AppCflags\' >> AndroidAppSettings.cfg
 echo AppLdflags=\'$AppLdflags\' >> AndroidAppSettings.cfg
 echo AppSubdirsBuild=\'$AppSubdirsBuild\' >> AndroidAppSettings.cfg
-echo AppUseCrystaXToolchain=$AppUseCrystaXToolchain >> AndroidAppSettings.cfg
 echo AppCmdline=\'$AppCmdline\' >> AndroidAppSettings.cfg
 echo ReadmeText=\'$ReadmeText\' >> AndroidAppSettings.cfg
 
@@ -400,6 +455,12 @@ if [ "$NeedDepthBuffer" = "y" ] ; then
 	NeedDepthBuffer=true
 else
 	NeedDepthBuffer=false
+fi
+
+if [ "$SwVideoMode" = "y" ] ; then
+	SwVideoMode=true
+else
+	SwVideoMode=false
 fi
 
 if [ "$AppUsesMouse" = "y" ] ; then
@@ -467,7 +528,7 @@ if [ "$MultiABI" = "y" ] ; then
 else
 	MultiABI="armeabi"
 fi
-LibrariesToLoad="System.loadLibrary(\\\"sdl-$LibSdlVersion\\\");"
+LibrariesToLoad="\\\"sdl-$LibSdlVersion\\\""
 StaticLibraries=`grep 'APP_AVAILABLE_STATIC_LIBS' project/jni/SettingsTemplate.mk | sed 's/.*=\(.*\)/\1/'`
 for lib in $CompiledLibraries; do
 	process=true
@@ -475,7 +536,7 @@ for lib in $CompiledLibraries; do
 		if [ "$lib" = "$lib1" ]; then process=false; fi
 	done
 	if $process; then
-		LibrariesToLoad="$LibrariesToLoad System.loadLibrary(\\\"$lib\\\");"
+		LibrariesToLoad="$LibrariesToLoad, \\\"$lib\\\""
 	fi
 done
 
@@ -509,6 +570,7 @@ cat project/src/Globals.java | \
 	sed "s/public static final boolean Using_SDL_1_3 = .*;/public static final boolean Using_SDL_1_3 = $UsingSdl13;/" | \
 	sed "s@public static String DataDownloadUrl = .*@public static String DataDownloadUrl = \"$AppDataDownloadUrl1\";@" | \
 	sed "s/public static boolean NeedDepthBuffer = .*;/public static boolean NeedDepthBuffer = $NeedDepthBuffer;/" | \
+	sed "s/public static boolean SwVideoMode = .*;/public static boolean SwVideoMode = $SwVideoMode;/" | \
 	sed "s/public static boolean HorizontalOrientation = .*;/public static boolean HorizontalOrientation = $HorizontalOrientation;/" | \
 	sed "s/public static boolean InhibitSuspend = .*;/public static boolean InhibitSuspend = $InhibitSuspend;/" | \
 	sed "s/public static boolean AppUsesMouse = .*;/public static boolean AppUsesMouse = $AppUsesMouse;/" | \
@@ -523,14 +585,14 @@ cat project/src/Globals.java | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmountAutoFire = .*;/public static int AppTouchscreenKeyboardKeysAmountAutoFire = $AppTouchscreenKeyboardKeysAmountAutoFire;/" | \
 	sed "s%public static String ReadmeText = .*%public static String ReadmeText = \"$ReadmeText\".replace(\"^\",\"\\\n\");%" | \
 	sed "s%public static String CommandLine = .*%public static String CommandLine = \"$AppCmdline\";%" | \
-	sed "s/public LoadLibrary() .*/public LoadLibrary() { $LibrariesToLoad };/" > \
+	sed "s/public static String AppLibraries.*/public static String AppLibraries[] = { $LibrariesToLoad };/" > \
 	project/src/Globals.java.1
 mv -f project/src/Globals.java.1 project/src/Globals.java
 
 echo Patching project/jni/Settings.mk
 echo '# DO NOT EDIT THIS FILE - it is automatically generated, edit file SettingsTemplate.mk' > project/jni/Settings.mk
 cat project/jni/SettingsTemplate.mk | \
-	sed "s/APP_MODULES := .*/APP_MODULES := application sdl-$LibSdlVersion sdl_main stlport jpeg png ogg flac vorbis freetype $CompiledLibraries/" | \
+	sed "s/APP_MODULES := .*/APP_MODULES := application sdl-$LibSdlVersion sdl_main stlport jpeg png ogg flac vorbis freetype sdl_fake_stdout $CompiledLibraries/" | \
 	sed "s/APP_ABI := .*/APP_ABI := $MultiABI/" | \
 	sed "s/SDL_JAVA_PACKAGE_PATH := .*/SDL_JAVA_PACKAGE_PATH := $AppFullNameUnderscored/" | \
 	sed "s^SDL_CURDIR_PATH := .*^SDL_CURDIR_PATH := $DataPath^" | \
@@ -557,13 +619,14 @@ done
 cd ../../..
 
 echo Cleaning up dependencies
-rm -rf project/libs/*
+rm -rf project/libs/* project/gen
 for OUT in obj; do
 rm -rf project/$OUT/local/*/objs/sdl_main/* project/$OUT/local/*/libsdl_main.so
 rm -rf project/$OUT/local/*/libsdl-*.so
 rm -rf project/$OUT/local/*/objs/sdl-*/src/*/android
 rm -rf project/$OUT/local/*/objs/sdl-*/src/video/SDL_video.o
 rm -rf project/$OUT/local/*/objs/sdl-*/SDL_renderer_gles.o
+rm -rf project/$OUT/local/*/libsdl_fake_stdout.a project/$OUT/local/*/objs/sdl_fake_stdout/*
 # Do not rebuild several huge libraries that do not depend on SDL version
 for LIB in freetype intl jpeg png lua mad stlport tremor xerces xml2; do
 	for ARCH in armeabi armeabi-v7a; do
@@ -579,6 +642,12 @@ mkdir -p project/assets
 rm -f project/assets/*
 if [ -d "project/jni/application/src/AndroidData" ] ; then
 	echo Copying asset files
+	for F in project/jni/application/src/AndroidData/*; do
+		if [ `cat $F | wc -c` -gt 1048576 ] ; then
+			echo "Error: the file $F is bigger than 1048576 bytes - some Android devices will fail to extract such file\nPlease split your data into several small files, or use HTTP download method"
+			exit 1
+		fi
+	done
 	cp project/jni/application/src/AndroidData/* project/assets/
 fi
 

@@ -27,6 +27,7 @@
 #include "SDL_thread.h"
 #include "../SDL_sysvideo.h"
 #include "../SDL_pixels_c.h"
+#include "../../events/SDL_events_c.h"
 
 #include "SDL_pixels.h"
 #include "SDL_video-1.3.h"
@@ -42,20 +43,19 @@
 #include <stdint.h>
 #include <math.h>
 #include <string.h> // for memset()
+#include <dlfcn.h>
 
 #define _THIS	SDL_VideoDevice *this
 
 #define DEBUGOUT(...)
 //#define DEBUGOUT(...) __android_log_print(ANDROID_LOG_INFO, "libSDL", __VA_ARGS__)
 
-/* Initialization/Query functions */
 static int ANDROID_VideoInit(_THIS, SDL_PixelFormat *vformat);
 static SDL_Rect **ANDROID_ListModes(_THIS, SDL_PixelFormat *format, Uint32 flags);
 static SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current, int width, int height, int bpp, Uint32 flags);
 static int ANDROID_SetColors(_THIS, int firstcolor, int ncolors, SDL_Color *colors);
 static void ANDROID_VideoQuit(_THIS);
 
-/* Hardware surface functions */
 static int ANDROID_AllocHWSurface(_THIS, SDL_Surface *surface);
 static int ANDROID_LockHWSurface(_THIS, SDL_Surface *surface);
 static void ANDROID_UnlockHWSurface(_THIS, SDL_Surface *surface);
@@ -67,6 +67,16 @@ static int ANDROID_CheckHWBlit(_THIS, SDL_Surface *src, SDL_Surface *dst);
 static int ANDROID_FillHWRect(_THIS, SDL_Surface *dst, SDL_Rect *rect, Uint32 color);
 static int ANDROID_SetHWColorKey(_THIS, SDL_Surface *surface, Uint32 key);
 static int ANDROID_SetHWAlpha(_THIS, SDL_Surface *surface, Uint8 value);
+static void* ANDROID_GL_GetProcAddress(_THIS, const char *proc);
+static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects);
+
+// Multithreaded video support for speed optimization
+static int ANDROID_VideoInitMT(_THIS, SDL_PixelFormat *vformat);
+static SDL_Surface *ANDROID_SetVideoModeMT(_THIS, SDL_Surface *current, int width, int height, int bpp, Uint32 flags);
+static void ANDROID_VideoQuitMT(_THIS);
+static void ANDROID_UpdateRectsMT(_THIS, int numrects, SDL_Rect *rects);
+static int ANDROID_FlipHWSurfaceMT(_THIS, SDL_Surface *surface);
+
 
 // Stubs to get rid of crashing in OpenGL mode
 // The implementation dependent data for the window manager cursor
@@ -90,17 +100,14 @@ WMcursor * ANDROID_CreateWMCursor(_THIS, Uint8 *data, Uint8 *mask, int w, int h,
 int ANDROID_ShowWMCursor(_THIS, WMcursor *cursor) {
     return 1;
 }
-void ANDROID_WarpWMCursor(_THIS, Uint16 x, Uint16 y) { }
-void ANDROID_MoveWMCursor(_THIS, int x, int y) { }
+void ANDROID_WarpWMCursor(_THIS, Uint16 x, Uint16 y)
+{
+	SDL_ANDROID_WarpMouse(x, y);
+}
+//void ANDROID_MoveWMCursor(_THIS, int x, int y) { }
 
 
-/* etc. */
-static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects);
-
-
-/* Private display data */
-
-#define SDL_NUMMODES 11
+#define SDL_NUMMODES 12
 static SDL_Rect *SDL_modelist[SDL_NUMMODES+1];
 
 //#define SDL_modelist		(this->hidden->SDL_modelist)
@@ -111,20 +118,18 @@ typedef struct SDL_Texture private_hwdata;
 // Pointer to in-memory video surface
 int SDL_ANDROID_sFakeWindowWidth = 640;
 int SDL_ANDROID_sFakeWindowHeight = 480;
-static int sdl_opengl = 0;
+int sdl_opengl = 0;
 static SDL_Window *SDL_VideoWindow = NULL;
 SDL_Surface *SDL_CurrentVideoSurface = NULL;
 static int HwSurfaceCount = 0;
 static SDL_Surface ** HwSurfaceList = NULL;
+void * glLibraryHandle = NULL;
 
 static Uint32 SDL_VideoThreadID = 0;
 int SDL_ANDROID_InsideVideoThread()
 {
 	return SDL_VideoThreadID == SDL_ThreadID();
 }
-
-
-static void SdlGlRenderInit();
 
 
 /* ANDROID driver bootstrap functions */
@@ -154,13 +159,13 @@ static SDL_VideoDevice *ANDROID_CreateDevice(int devindex)
 	}
 
 	/* Set the function pointers */
-	device->VideoInit = ANDROID_VideoInit;
+	device->VideoInit = SDL_ANDROID_VideoMultithreaded ? ANDROID_VideoInitMT : ANDROID_VideoInit;
 	device->ListModes = ANDROID_ListModes;
-	device->SetVideoMode = ANDROID_SetVideoMode;
+	device->SetVideoMode = SDL_ANDROID_VideoMultithreaded ? ANDROID_SetVideoModeMT : ANDROID_SetVideoMode;
 	device->CreateYUVOverlay = NULL;
 	device->SetColors = ANDROID_SetColors;
-	device->UpdateRects = ANDROID_UpdateRects;
-	device->VideoQuit = ANDROID_VideoQuit;
+	device->UpdateRects = SDL_ANDROID_VideoMultithreaded ? ANDROID_UpdateRectsMT : ANDROID_UpdateRects;
+	device->VideoQuit = SDL_ANDROID_VideoMultithreaded ? ANDROID_VideoQuitMT : ANDROID_VideoQuit;
 	device->AllocHWSurface = ANDROID_AllocHWSurface;
 	device->CheckHWBlit = ANDROID_CheckHWBlit;
 	device->FillHWRect = ANDROID_FillHWRect;
@@ -168,7 +173,7 @@ static SDL_VideoDevice *ANDROID_CreateDevice(int devindex)
 	device->SetHWAlpha = ANDROID_SetHWAlpha;
 	device->LockHWSurface = ANDROID_LockHWSurface;
 	device->UnlockHWSurface = ANDROID_UnlockHWSurface;
-	device->FlipHWSurface = ANDROID_FlipHWSurface;
+	device->FlipHWSurface = SDL_ANDROID_VideoMultithreaded ? ANDROID_FlipHWSurfaceMT : ANDROID_FlipHWSurface;
 	device->FreeHWSurface = ANDROID_FreeHWSurface;
 	device->SetCaption = NULL;
 	device->SetIcon = NULL;
@@ -178,14 +183,16 @@ static SDL_VideoDevice *ANDROID_CreateDevice(int devindex)
 	device->InitOSKeymap = ANDROID_InitOSKeymap;
 	device->PumpEvents = ANDROID_PumpEvents;
 	device->GL_SwapBuffers = ANDROID_GL_SwapBuffers;
+	device->GL_GetProcAddress = ANDROID_GL_GetProcAddress;
 	device->free = ANDROID_DeleteDevice;
+	device->WarpWMCursor = ANDROID_WarpWMCursor;
 
 	// Stubs
 	device->FreeWMCursor = ANDROID_FreeWMCursor;
 	device->CreateWMCursor = ANDROID_CreateWMCursor;
 	device->ShowWMCursor = ANDROID_ShowWMCursor;
-	//device->WarpWMCursor = ANDROID_WarpWMCursor;
-	//device->MoveWMCursor = ANDROID_MoveWMCursor;
+
+	glLibraryHandle = dlopen("libGLESv1_CM.so", RTLD_NOW);
 	
 	return device;
 }
@@ -245,10 +252,11 @@ int ANDROID_VideoInit(_THIS, SDL_PixelFormat *vformat)
 	SDL_modelist[8]->h = SDL_ANDROID_sWindowHeight / 2;
 	SDL_modelist[9]->w = 480; SDL_modelist[9]->h = 320; // Virtual wide-screen mode
 	SDL_modelist[10]->w = 800; SDL_modelist[10]->h = 480; // Virtual wide-screen mode
-	SDL_modelist[11] = NULL;
+	SDL_modelist[11]->w = 544; SDL_modelist[11]->h = 332; // I have no idea where this videomode is used
+	SDL_modelist[12] = NULL;
 	
 	SDL_VideoInit_1_3(NULL, 0);
-
+	
 	/* We're done! */
 	return(0);
 }
@@ -266,7 +274,7 @@ SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current,
 	SDL_PixelFormat format;
 	int bpp1;
 	
-	__android_log_print(ANDROID_LOG_INFO, "libSDL", "SDL_SetVideoMode(): application requested mode %dx%d", width, height);
+	__android_log_print(ANDROID_LOG_INFO, "libSDL", "SDL_SetVideoMode(): application requested mode %dx%d OpenGL %d HW %d", width, height, flags & SDL_OPENGL, flags & SDL_HWSURFACE);
 	if( ! SDL_ANDROID_InsideVideoThread() )
 	{
 		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
@@ -325,6 +333,9 @@ SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current,
 				SDL_OutOfMemory();
 				return(NULL);
 			}
+			if( SDL_ANDROID_SmoothVideo )
+				SDL_SetTextureScaleMode((SDL_Texture *)current->hwdata, SDL_SCALEMODE_SLOW);
+
 			// Register main video texture to be recreated when needed
 			HwSurfaceCount++;
 			HwSurfaceList = SDL_realloc( HwSurfaceList, HwSurfaceCount * sizeof(SDL_Surface *) );
@@ -351,7 +362,6 @@ SDL_Surface *ANDROID_SetVideoMode(_THIS, SDL_Surface *current,
 
 	/* Set up the new mode framebuffer */
 	SDL_CurrentVideoSurface = current;
-	
 
 	/* We're done */
 	return(current);
@@ -467,6 +477,9 @@ static int ANDROID_AllocHWSurface(_THIS, SDL_Surface *surface)
 		return(-1);
 	}
 
+	if( SDL_ANDROID_SmoothVideo )
+		SDL_SetTextureScaleMode((SDL_Texture *)surface->hwdata, SDL_SCALEMODE_SLOW);
+
 	if( surface->format->Amask )
 	{
 		SDL_SetTextureAlphaMod((struct SDL_Texture *)surface->hwdata, SDL_ALPHA_OPAQUE);
@@ -553,6 +566,8 @@ static int ANDROID_LockHWSurface(_THIS, SDL_Surface *surface)
 				SDL_OutOfMemory();
 				return(-1);
 			}
+			if( SDL_ANDROID_SmoothVideo )
+				SDL_SetTextureScaleMode((SDL_Texture *)SDL_CurrentVideoSurface->hwdata, SDL_SCALEMODE_SLOW);
 			// Register main video texture to be recreated when needed
 			HwSurfaceCount++;
 			HwSurfaceList = SDL_realloc( HwSurfaceList, HwSurfaceCount * sizeof(SDL_Surface *) );
@@ -803,45 +818,8 @@ static int ANDROID_SetHWAlpha(_THIS, SDL_Surface *surface, Uint8 value)
 	return SDL_SetTextureAlphaMod((struct SDL_Texture *)surface->hwdata, value);
 };
 
-static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects)
+static void ANDROID_FlipHWSurfaceInternal()
 {
-	if( !SDL_ANDROID_InsideVideoThread() )
-	{
-		/*
-		// Crash to get stack trace and determine culprit thread
-		static count = 100;
-		count--;
-		if(count <=0 )
-			abort();
-		*/
-		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
-		return;
-	}
-
-	if(!SDL_CurrentVideoSurface)
-	{
-		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s without main video surface!", __PRETTY_FUNCTION__);
-		return;
-	}
-	//__android_log_print(ANDROID_LOG_INFO, "libSDL", "ANDROID_UpdateRects()");
-	// Used only in single-buffer mode
-	//if( SDL_CurrentVideoSurface && !(SDL_CurrentVideoSurface->flags & SDL_HWSURFACE) )
-	ANDROID_FlipHWSurface(this, SDL_CurrentVideoSurface);
-}
-
-static int ANDROID_FlipHWSurface(_THIS, SDL_Surface *surface)
-{
-	if( !SDL_ANDROID_InsideVideoThread() )
-	{
-		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
-		return;
-	}
-
-	if(!SDL_CurrentVideoSurface)
-	{
-		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s without main video surface!", __PRETTY_FUNCTION__);
-		return;
-	}
 	//__android_log_print(ANDROID_LOG_INFO, "libSDL", "ANDROID_FlipHWSurface()");
 	if( SDL_CurrentVideoSurface->hwdata && SDL_CurrentVideoSurface->pixels && ! ( SDL_CurrentVideoSurface->flags & SDL_HWSURFACE ) )
 	{
@@ -881,17 +859,53 @@ static int ANDROID_FlipHWSurface(_THIS, SDL_Surface *surface)
 			glDisableClientState(GL_VERTEX_ARRAY);
 			glPopMatrix();
 			glFlush();
-
 		}
 	}
+};
+
+static int ANDROID_FlipHWSurface(_THIS, SDL_Surface *surface)
+{
+	if( !SDL_ANDROID_InsideVideoThread() )
+	{
+		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
+		return -1;
+	}
+
+	if(!SDL_CurrentVideoSurface)
+	{
+		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s without main video surface!", __PRETTY_FUNCTION__);
+		return -1;
+	}
+
+	ANDROID_FlipHWSurfaceInternal();
 
 	SDL_ANDROID_CallJavaSwapBuffers();
 
 	return(0);
-};
+}
+
+static void ANDROID_UpdateRects(_THIS, int numrects, SDL_Rect *rects)
+{
+	if( !SDL_ANDROID_InsideVideoThread() )
+	{
+		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
+		return;
+	}
+
+	if(!SDL_CurrentVideoSurface)
+	{
+		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s without main video surface!", __PRETTY_FUNCTION__);
+		return;
+	}
+
+	ANDROID_FlipHWSurfaceInternal();
+
+	SDL_ANDROID_CallJavaSwapBuffers();
+}
 
 void ANDROID_GL_SwapBuffers(_THIS)
 {
+	//__android_log_print(ANDROID_LOG_INFO, "libSDL", "ANDROID_GL_SwapBuffers");
 	if( !SDL_ANDROID_InsideVideoThread() )
 	{
 		__android_log_print(ANDROID_LOG_INFO, "libSDL", "Error: calling %s not from the main thread!", __PRETTY_FUNCTION__);
@@ -921,6 +935,18 @@ void SDL_ANDROID_VideoContextLost()
 
 void SDL_ANDROID_VideoContextRecreated()
 {
+	__android_log_print(ANDROID_LOG_INFO, "libSDL", "Sending SDL_VIDEORESIZE event %dx%d", SDL_ANDROID_sFakeWindowWidth, SDL_ANDROID_sFakeWindowHeight);
+	//SDL_PrivateResize(SDL_ANDROID_sFakeWindowWidth, SDL_ANDROID_sFakeWindowHeight);
+	if ( SDL_ProcessEvents[SDL_VIDEORESIZE] == SDL_ENABLE ) {
+		SDL_Event event;
+		event.type = SDL_VIDEORESIZE;
+		event.resize.w = SDL_ANDROID_sFakeWindowWidth;
+		event.resize.h = SDL_ANDROID_sFakeWindowHeight;
+		if ( (SDL_EventOK == NULL) || (*SDL_EventOK)(&event) ) {
+			SDL_PushEvent(&event);
+		}
+	}
+
 	if( ! sdl_opengl )
 	{
 		int i;
@@ -937,12 +963,187 @@ void SDL_ANDROID_VideoContextRecreated()
 			if( HwSurfaceList[i] == SDL_CurrentVideoSurface )
 				format = SDL_PIXELFORMAT_RGB565;
 			HwSurfaceList[i]->hwdata = (struct private_hwdata *)SDL_CreateTexture(format, SDL_TEXTUREACCESS_STATIC, HwSurfaceList[i]->w, HwSurfaceList[i]->h);
-			if( !HwSurfaceList[i]->hwdata ) 
+			if( !HwSurfaceList[i]->hwdata )
 			{
 				SDL_OutOfMemory();
 				return;
 			}
+			if( SDL_ANDROID_SmoothVideo )
+				SDL_SetTextureScaleMode((SDL_Texture *)HwSurfaceList[i]->hwdata, SDL_SCALEMODE_SLOW);
 			ANDROID_UnlockHWSurface(NULL, HwSurfaceList[i]); // Re-fill texture with graphics
 		}
 	}
 };
+
+static void* ANDROID_GL_GetProcAddress(_THIS, const char *proc)
+{
+	void * func = dlsym(glLibraryHandle, proc);
+	//__android_log_print(ANDROID_LOG_INFO, "libSDL", "ANDROID_GL_GetProcAddress(\"%s\"): %p", proc, func);
+	return func;
+};
+
+// Multithreaded video - this will free up some CPU time while GPU renders video inside SDL_Flip()
+enum videoThreadCmd_t { CMD_INIT, CMD_SETVIDEOMODE, CMD_QUIT, CMD_UPDATERECTS, CMD_FLIP };
+typedef struct
+{
+	SDL_mutex * mutex;
+	SDL_cond * cond;
+	SDL_cond * cond2;
+	int execute;
+	int threadReady;
+	enum videoThreadCmd_t cmd;
+	SDL_VideoDevice *_this;
+	SDL_PixelFormat *vformat;
+	SDL_Surface *current;
+	int width;
+	int height;
+	int bpp;
+	Uint32 flags;
+	
+	int retcode;
+	SDL_Surface * retcode2;
+} videoThread_t;
+static videoThread_t videoThread;
+
+extern void SDL_ANDROID_MultiThreadedVideoLoopInit();
+extern void SDL_ANDROID_MultiThreadedVideoLoop();
+
+void SDL_ANDROID_MultiThreadedVideoLoopInit()
+{
+	videoThread.mutex = SDL_CreateMutex();
+	videoThread.cond = SDL_CreateCond();
+	videoThread.cond2 = SDL_CreateCond();
+	videoThread.execute = 0;
+}
+
+void SDL_ANDROID_MultiThreadedVideoLoop()
+{
+	while(1)
+	{
+		int signalNeeded = 0;
+		int swapBuffersNeeded = 0;
+		SDL_mutexP(videoThread.mutex);
+		videoThread.threadReady = 1;
+		SDL_CondSignal(videoThread.cond2);
+		SDL_CondWaitTimeout(videoThread.cond, videoThread.mutex, 1000);
+		if( videoThread.execute )
+		{
+			videoThread.threadReady = 0;
+			switch( videoThread.cmd )
+			{
+				case CMD_INIT:
+					videoThread.retcode = ANDROID_VideoInit(videoThread._this, videoThread.vformat);
+					break;
+				case CMD_SETVIDEOMODE:
+					videoThread.retcode2 = ANDROID_SetVideoMode(videoThread._this, videoThread.current,
+							videoThread.width, videoThread.height, videoThread.bpp, videoThread.flags);
+					break;
+				case CMD_QUIT:
+					ANDROID_VideoQuit(videoThread._this);
+					break;
+				case CMD_UPDATERECTS:
+					ANDROID_FlipHWSurfaceInternal();
+					swapBuffersNeeded = 1;
+					break;
+				case CMD_FLIP:
+					ANDROID_FlipHWSurfaceInternal();
+					swapBuffersNeeded = 1;
+					break;
+			}
+			videoThread.execute = 0;
+			signalNeeded = 1;
+		}
+		SDL_mutexV(videoThread.mutex);
+		if( signalNeeded )
+			SDL_CondSignal(videoThread.cond2);
+		if( swapBuffersNeeded )
+		{
+			SDL_ANDROID_CallJavaSwapBuffers();
+		}
+	}
+}
+
+int ANDROID_VideoInitMT(_THIS, SDL_PixelFormat *vformat)
+{
+	SDL_mutexP(videoThread.mutex);
+	while( ! videoThread.threadReady )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	videoThread.cmd = CMD_INIT;
+	videoThread._this = this;
+	videoThread.vformat = vformat;
+	videoThread.execute = 1;
+	SDL_CondSignal(videoThread.cond);
+	while( videoThread.execute )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	int ret = videoThread.retcode;
+	SDL_mutexV(videoThread.mutex);
+	return ret;
+}
+
+SDL_Surface *ANDROID_SetVideoModeMT(_THIS, SDL_Surface *current, int width, int height, int bpp, Uint32 flags)
+{
+	if( flags & SDL_OPENGL || flags & SDL_HWSURFACE )
+	{
+		return NULL;
+	}
+	SDL_mutexP(videoThread.mutex);
+	while( ! videoThread.threadReady )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	videoThread.cmd = CMD_SETVIDEOMODE;
+	videoThread._this = this;
+	videoThread.current = current;
+	videoThread.width = width;
+	videoThread.height = height;
+	videoThread.bpp = bpp;
+	videoThread.flags = flags;
+	videoThread.execute = 1;
+	SDL_CondSignal(videoThread.cond);
+	while( videoThread.execute )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	SDL_Surface * ret = videoThread.retcode2;
+	SDL_mutexV(videoThread.mutex);
+	return ret;
+}
+
+void ANDROID_VideoQuitMT(_THIS)
+{
+	SDL_mutexP(videoThread.mutex);
+	while( ! videoThread.threadReady )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	videoThread.cmd = CMD_QUIT;
+	videoThread._this = this;
+	videoThread.execute = 1;
+	SDL_CondSignal(videoThread.cond);
+	while( videoThread.execute )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	SDL_mutexV(videoThread.mutex);
+}
+
+void ANDROID_UpdateRectsMT(_THIS, int numrects, SDL_Rect *rects)
+{
+	SDL_mutexP(videoThread.mutex);
+	while( ! videoThread.threadReady )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	videoThread.cmd = CMD_UPDATERECTS;
+	videoThread._this = this;
+	videoThread.execute = 1;
+	SDL_CondSignal(videoThread.cond);
+	while( videoThread.execute )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	SDL_mutexV(videoThread.mutex);
+}
+
+int ANDROID_FlipHWSurfaceMT(_THIS, SDL_Surface *surface)
+{
+	SDL_mutexP(videoThread.mutex);
+	while( ! videoThread.threadReady )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	videoThread.cmd = CMD_FLIP;
+	videoThread._this = this;
+	videoThread.execute = 1;
+	SDL_CondSignal(videoThread.cond);
+	while( videoThread.execute )
+		SDL_CondWaitTimeout(videoThread.cond2, videoThread.mutex, 1000);
+	SDL_mutexV(videoThread.mutex);
+	return 0;
+}

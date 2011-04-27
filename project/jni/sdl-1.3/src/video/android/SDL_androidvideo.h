@@ -34,20 +34,30 @@ extern int SDL_ANDROID_sRealWindowWidth;
 extern int SDL_ANDROID_sRealWindowHeight;
 extern int SDL_ANDROID_sFakeWindowWidth; // SDL 1.2 only
 extern int SDL_ANDROID_sFakeWindowHeight; // SDL 1.2 only
+extern int SDL_ANDROID_TouchscreenCalibrationWidth;
+extern int SDL_ANDROID_TouchscreenCalibrationHeight;
+extern int SDL_ANDROID_TouchscreenCalibrationX;
+extern int SDL_ANDROID_TouchscreenCalibrationY;
+extern int SDL_ANDROID_SmoothVideo;
+extern int SDL_ANDROID_VideoMultithreaded;
+extern void SDL_ANDROID_TextInputInit(char * buffer, int len);
+extern void SDL_ANDROID_TextInputFinished();
 extern SDL_Surface *SDL_CurrentVideoSurface;
 extern SDL_Rect SDL_ANDROID_ForceClearScreenRect;
 extern int SDL_ANDROID_ShowScreenUnderFinger;
 extern SDL_Rect SDL_ANDROID_ShowScreenUnderFingerRect, SDL_ANDROID_ShowScreenUnderFingerRectSrc;
 extern int SDL_ANDROID_CallJavaSwapBuffers();
-extern void SDL_ANDROID_CallJavaShowScreenKeyboard();
+extern void SDL_ANDROID_CallJavaShowScreenKeyboard(const char * oldText, char * outBuf, int outBufLen);
 extern int SDL_ANDROID_drawTouchscreenKeyboard();
 extern void SDL_ANDROID_VideoContextLost();
 extern void SDL_ANDROID_VideoContextRecreated();
 extern void SDL_ANDROID_processAndroidTrackballDampening();
 extern void SDL_ANDROID_processMoveMouseWithKeyboard();
 extern int SDL_ANDROID_InsideVideoThread();
+extern void SDL_ANDROID_initFakeStdout();
 extern SDL_VideoDevice *ANDROID_CreateDevice_1_3(int devindex);
-extern void SDL_ANDROID_DeferredTextInput();
+extern void SDL_ANDROID_ProcessDeferredEvents();
+extern void SDL_ANDROID_WarpMouse(int x, int y);
 
 #if SDL_VERSION_ATLEAST(1,3,0)
 extern SDL_Window * ANDROID_CurrentWindow;

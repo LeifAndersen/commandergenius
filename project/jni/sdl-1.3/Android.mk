@@ -8,7 +8,8 @@ ifndef SDL_JAVA_PACKAGE_PATH
 $(error Please define SDL_JAVA_PACKAGE_PATH to the path of your Java package with dots replaced with underscores, for example "com_example_SanAngeles")
 endif
 
-LOCAL_CFLAGS := -O3 -I$(LOCAL_PATH)/include \
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/include
+LOCAL_CFLAGS := -O3 \
 	-DSDL_JAVA_PACKAGE_PATH=$(SDL_JAVA_PACKAGE_PATH) \
 	-DSDL_CURDIR_PATH=\"$(SDL_CURDIR_PATH)\" \
 	-DSDL_TRACKBALL_KEYUP_DELAY=$(SDL_TRACKBALL_KEYUP_DELAY) \
@@ -37,6 +38,7 @@ SDL_SRCS := \
 	src/audio/android/*.c \
 	src/cdrom/dummy/*.c \
 	src/video/android/*.c \
+	src/video/android/*.cpp \
 	src/haptic/dummy/*.c \
 	src/loadso/dlopen/*.c \
 	src/atomic/dummy/*.c \
