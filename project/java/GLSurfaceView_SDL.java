@@ -595,6 +595,8 @@ public class GLSurfaceView_SDL extends SurfaceView implements SurfaceHolder.Call
         public void setSwapBuffersCallback( SwapBuffersCallback c ) {
             mSwapBuffersCallback = c;
         }
+
+        public abstract void DrawLogo(GL10 gl);
         
         private SwapBuffersCallback mSwapBuffersCallback = null;
     }
@@ -904,6 +906,7 @@ public class GLSurfaceView_SDL extends SurfaceView implements SurfaceHolder.Call
                 mNeedStart = true;
                 mSizeChanged = true;
                 SwapBuffers();
+                mRenderer.DrawLogo(mGL);
                 SwapBuffers();
 
                 mRenderer.onDrawFrame(mGL);
@@ -929,7 +932,6 @@ public class GLSurfaceView_SDL extends SurfaceView implements SurfaceHolder.Call
              * This is our main activity thread's loop, we go until
              * asked to quit.
              */
-            try {
 
                 /*
                  *  Update the asynchronous state (window size)
@@ -954,7 +956,9 @@ public class GLSurfaceView_SDL extends SurfaceView implements SurfaceHolder.Call
                     }
                     while (needToWait()) {
                         //Log.v("SDL", "GLSurfaceView_SDL::run(): paused");
-                        wait();
+                        try {
+                            wait(500);
+                        } catch(Exception e) { }
                     }
                     if (mDone) {
                         return false;
@@ -996,10 +1000,6 @@ public class GLSurfaceView_SDL extends SurfaceView implements SurfaceHolder.Call
                 if( Globals.NonBlockingSwapBuffers )
                     return false;
               }
-
-            } catch (java.lang.InterruptedException e) {
-               return false;
-            }
         }
 
         private boolean needToWait() {

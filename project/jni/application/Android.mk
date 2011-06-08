@@ -25,12 +25,13 @@ LOCAL_C_INCLUDES :=
 ifeq ($(CRYSTAX_TOOLCHAIN)$(NDK_R5_TOOLCHAIN),)
 LOCAL_C_INCLUDES += $(LOCAL_PATH)/../stlport/stlport
 endif
+ifneq ($(CRYSTAX_R5B3_TOOLCHAIN),)
+LOCAL_C_INCLUDES += $(NDK_PATH)/sources/wchar-support/include
+endif
 
 LOCAL_C_INCLUDES += $(foreach D, $(APP_SUBDIRS), $(LOCAL_PATH)/$(D)) \
 					$(LOCAL_PATH)/../sdl-$(SDL_VERSION)/include \
 					$(foreach L, $(COMPILED_LIBRARIES), $(LOCAL_PATH)/../$(L)/include) \
-
-LOCAL_CFLAGS += -include $(LOCAL_PATH)/../sdl_fake_stdout/include/SDL_android_printf.h
 
 LOCAL_CFLAGS += $(APPLICATION_ADDITIONAL_CFLAGS)
 
@@ -45,13 +46,17 @@ LOCAL_SHARED_LIBRARIES := sdl-$(SDL_VERSION) $(filter-out $(APP_AVAILABLE_STATIC
 
 LOCAL_STATIC_LIBRARIES := $(filter $(APP_AVAILABLE_STATIC_LIBS), $(COMPILED_LIBRARIES))
 
-LOCAL_STATIC_LIBRARIES += stlport sdl_fake_stdout
+LOCAL_STATIC_LIBRARIES += stlport
 
 LOCAL_LDLIBS := -lGLESv1_CM -ldl -llog -lz
 
-LOCAL_LDFLAGS := -Lobj/local/armeabi -Wl,-u,_SDL_ANDROID_initFakeStdout
+LOCAL_LDFLAGS := -Lobj/local/armeabi 
 
 LOCAL_LDFLAGS += $(APPLICATION_ADDITIONAL_LDFLAGS)
+
+ifneq ($(CRYSTAX_R5B3_TOOLCHAIN),)
+LOCAL_LDLIBS += -L$(NDK_PATH)/sources/wchar-support/libs/armeabi -lwchar_static
+endif
 
 LIBS_WITH_LONG_SYMBOLS := $(strip $(shell \
 	for f in $(LOCAL_PATH)/../../obj/local/armeabi/*.so ; do \
@@ -89,7 +94,7 @@ ifneq ($(APPLICATION_CUSTOM_BUILD_SCRIPT),)
 
 LOCAL_PATH_SDL_APPLICATION := $(LOCAL_PATH)
 
-.NOTPARALLEL: $(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so) $(LOCAL_PATH)/src/libapplication.so
+.NOTPARALLEL: $(abspath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so) $(LOCAL_PATH)/src/libapplication.so
 
 # Enforce rebuilding
 $(shell rm -f $(LOCAL_PATH)/src/libapplication.so)
@@ -100,7 +105,7 @@ $(LOCAL_PATH)/src/libapplication.so: $(LOCAL_PATH)/src/AndroidBuild.sh $(LOCAL_P
 	echo Launching script $(LOCAL_PATH_SDL_APPLICATION)/AndroidBuild.sh
 	cd $(LOCAL_PATH_SDL_APPLICATION)/src && ./AndroidBuild.sh
 
-$(realpath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so): $(LOCAL_PATH)/src/libapplication.so OVERRIDE_CUSTOM_LIB
+$(abspath $(LOCAL_PATH)/../../obj/local/armeabi/libapplication.so): $(LOCAL_PATH)/src/libapplication.so OVERRIDE_CUSTOM_LIB
 	cp -f $< $@
 
 .PHONY: OVERRIDE_CUSTOM_LIB

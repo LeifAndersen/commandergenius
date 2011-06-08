@@ -208,6 +208,7 @@ void UpdateScreenUnderFingerRect(int x, int y)
 JNIEXPORT void JNICALL 
 JAVA_EXPORT_NAME(DemoGLSurfaceView_nativeMouse) ( JNIEnv*  env, jobject  thiz, jint x, jint y, jint action, jint pointerId, jint force, jint radius )
 {
+	// TODO: this method is damn huge
 	int i;
 #if SDL_VERSION_ATLEAST(1,3,0)
 
@@ -651,29 +652,34 @@ void SDL_ANDROID_WarpMouse(int x, int y)
 
 static int processAndroidTrackball(int key, int action);
 
-JNIEXPORT void JNICALL 
+JNIEXPORT jint JNICALL
 JAVA_EXPORT_NAME(DemoGLSurfaceView_nativeKey) ( JNIEnv*  env, jobject thiz, jint key, jint action )
 {
 #if SDL_VERSION_ATLEAST(1,3,0)
 #else
 	if( !SDL_CurrentVideoSurface )
-		return;
+		return 1;
 #endif
+
 	if( isTrackballUsed )
 		if( processAndroidTrackball(key, action) )
-			return;
+			return 1;
 	if( key == rightClickKey && rightClickMethod == RIGHT_CLICK_WITH_KEY )
 	{
 		SDL_ANDROID_MainThreadPushMouseButton( action ? SDL_PRESSED : SDL_RELEASED, SDL_BUTTON_RIGHT );
-		return;
+		return 1;
 	}
 	if( (key == leftClickKey && leftClickMethod == LEFT_CLICK_WITH_KEY) || (clickMouseWithDpadCenter && key == KEYCODE_DPAD_CENTER) )
 	{
 		SDL_ANDROID_MainThreadPushMouseButton( action ? SDL_PRESSED : SDL_RELEASED, SDL_BUTTON_LEFT );
-		return;
+		return 1;
 	}
 
+	if( TranslateKey(key) == SDLK_NO_REMAP )
+		return 0;
+
 	SDL_ANDROID_MainThreadPushKeyboardKey( action ? SDL_PRESSED : SDL_RELEASED, TranslateKey(key) );
+	return 1;
 }
 
 static char * textInputBuffer = NULL;
@@ -690,6 +696,8 @@ void SDL_ANDROID_TextInputInit(char * buffer, int len)
 JNIEXPORT void JNICALL
 JAVA_EXPORT_NAME(DemoRenderer_nativeTextInput) ( JNIEnv*  env, jobject thiz, jint ascii, jint unicode )
 {
+	if( ascii == 10 )
+		ascii = SDLK_RETURN;
 	if( !textInputBuffer )
 		SDL_ANDROID_MainThreadPushText(ascii, unicode);
 	else
@@ -761,6 +769,7 @@ static int getClickTimeout(int v)
 	return 1000;
 }
 
+// Mwahaha overkill!
 JNIEXPORT void JNICALL
 JAVA_EXPORT_NAME(Settings_nativeSetMouseUsed) ( JNIEnv*  env, jobject thiz,
 		jint RightClickMethod, jint ShowScreenUnderFinger, jint LeftClickMethod,
@@ -1330,7 +1339,6 @@ extern void SDL_ANDROID_MainThreadPushKeyboardKey(int pressed, SDL_scancode key)
 	
 	SDL_Event * ev = &BufferedEvents[BufferedEventsEnd];
 	
-
 	if( moveMouseWithArrowKeys && (
 		key == SDL_KEY(UP) || key == SDL_KEY(DOWN) ||
 		key == SDL_KEY(LEFT) || key == SDL_KEY(RIGHT) ) )

@@ -27,6 +27,7 @@ import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.FrameLayout;
+import android.graphics.drawable.Drawable;
 import android.content.res.Configuration;
 import android.app.Notification;
 import android.app.NotificationManager;
@@ -81,7 +82,7 @@ public class MainActivity extends Activity {
 				{
 					setUpStatusLabel();
 					System.out.println("libSDL: User clicked change phone config button");
-					Settings.showConfig(p);
+					Settings.showConfig(p, false);
 				}
 		};
 		_btn.setOnClickListener(new onClickListener(this));
@@ -93,7 +94,14 @@ public class MainActivity extends Activity {
 		ImageView img = new ImageView(this);
 
 		img.setScaleType(ImageView.ScaleType.FIT_CENTER /* FIT_XY */ );
-		img.setImageResource(R.drawable.publisherlogo);
+		try
+		{
+			img.setImageDrawable(Drawable.createFromStream(getAssets().open("logo.png"), "logo.png"));
+		}
+		catch(Exception e)
+		{
+			img.setImageResource(R.drawable.publisherlogo);
+		}
 		img.setLayoutParams(new ViewGroup.LayoutParams( ViewGroup.LayoutParams.FILL_PARENT, ViewGroup.LayoutParams.FILL_PARENT));
 		_layout.addView(img);
 		
@@ -113,16 +121,19 @@ public class MainActivity extends Activity {
 
 		if( !Settings.settingsChanged )
 		{
-			System.out.println("libSDL: 3-second timeout in startup screen");
+			System.out.println("libSDL: " + String.valueOf(Globals.StartupMenuButtonTimeout) + "-msec timeout in startup screen");
 			class Callback implements Runnable
 			{
 				MainActivity p;
 				Callback( MainActivity _p ) { p = _p; }
 				public void run()
 				{
-					try {
-						Thread.sleep(3000);
-					} catch( InterruptedException e ) {};
+					if( Globals.StartupMenuButtonTimeout > 0 )
+					{
+						try {
+							Thread.sleep(Globals.StartupMenuButtonTimeout);
+						} catch( InterruptedException e ) {};
+					}
 					if( Settings.settingsChanged )
 						return;
 					System.out.println("libSDL: Timeout reached in startup screen, process with downloader");
@@ -310,16 +321,19 @@ public class MainActivity extends Activity {
 	};
 
 	@Override
-	public boolean onKeyDown(int keyCode, final KeyEvent event) {
-		// Overrides Back key to use in our app
+	public boolean onKeyDown(int keyCode, final KeyEvent event)
+	{
 		if(_screenKeyboard != null)
 			_screenKeyboard.onKeyDown(keyCode, event);
 		else
 		if( mGLView != null )
-			 mGLView.nativeKey( keyCode, 1 );
+		{
+			if( mGLView.nativeKey( keyCode, 1 ) == 0 )
+				return super.onKeyDown(keyCode, event);
+		}
 		else
 		if( keyCode == KeyEvent.KEYCODE_BACK && downloader != null )
-		{ 
+		{
 			if( downloader.DownloadFailed )
 				System.exit(1);
 			if( !downloader.DownloadComplete )
@@ -334,17 +348,22 @@ public class MainActivity extends Activity {
 	}
 	
 	@Override
-	public boolean onKeyUp(int keyCode, final KeyEvent event) {
+	public boolean onKeyUp(int keyCode, final KeyEvent event)
+	{
 		if(_screenKeyboard != null)
 			_screenKeyboard.onKeyUp(keyCode, event);
 		else
 		if( mGLView != null )
-			mGLView.nativeKey( keyCode, 0 );
+		{
+			if( mGLView.nativeKey( keyCode, 0 ) == 0 )
+				return super.onKeyUp(keyCode, event);
+		}
 		return true;
 	}
 	
 	@Override
-	public boolean dispatchTouchEvent(final MotionEvent ev) {
+	public boolean dispatchTouchEvent(final MotionEvent ev)
+	{
 		if(_screenKeyboard != null)
 			_screenKeyboard.dispatchTouchEvent(ev);
 		else
@@ -358,9 +377,16 @@ public class MainActivity extends Activity {
 			touchListener.onTouchEvent(ev);
 		return true;
 	}
+	
+	@Override
+	public boolean dispatchGenericMotionEvent (final MotionEvent ev)
+	{
+		return dispatchTouchEvent(ev);
+	}
 
 	@Override
-	public void onConfigurationChanged(Configuration newConfig) {
+	public void onConfigurationChanged(Configuration newConfig)
+	{
 		super.onConfigurationChanged(newConfig);
 		// Do nothing here
 	}

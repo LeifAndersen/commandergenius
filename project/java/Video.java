@@ -12,6 +12,8 @@
 package net.sourceforge.clonekeenplus;
 
 import javax.microedition.khronos.opengles.GL10;
+import javax.microedition.khronos.opengles.GL11;
+import javax.microedition.khronos.opengles.GL11Ext;
 
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGL11;
@@ -29,6 +31,10 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.os.Environment;
 import java.io.File;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
+import android.content.res.Resources;
+import android.content.res.AssetManager;
 
 import android.widget.TextView;
 import java.lang.Thread;
@@ -37,6 +43,27 @@ import android.os.Build;
 import java.lang.reflect.Method;
 import java.util.LinkedList;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+
+
+class Mouse
+{
+	public static final int LEFT_CLICK_NORMAL = 0;
+	public static final int LEFT_CLICK_NEAR_CURSOR = 1;
+	public static final int LEFT_CLICK_WITH_MULTITOUCH = 2;
+	public static final int LEFT_CLICK_WITH_PRESSURE = 3;
+	public static final int LEFT_CLICK_WITH_KEY = 4;
+	public static final int LEFT_CLICK_WITH_TIMEOUT = 5;
+	public static final int LEFT_CLICK_WITH_TAP = 6;
+	public static final int LEFT_CLICK_WITH_TAP_OR_TIMEOUT = 7;
+	
+	public static final int RIGHT_CLICK_NONE = 0;
+	public static final int RIGHT_CLICK_WITH_MULTITOUCH = 1;
+	public static final int RIGHT_CLICK_WITH_PRESSURE = 2;
+	public static final int RIGHT_CLICK_WITH_KEY = 3;
+	public static final int RIGHT_CLICK_WITH_TIMEOUT = 4;
+}
 
 abstract class DifferentTouchInput
 {
@@ -108,13 +135,19 @@ abstract class DifferentTouchInput
 		{
 			private static final MultiTouchInput sInstance = new MultiTouchInput();
 		}
+
+		static final int SDL_FINGER_DOWN = 0;
+		static final int SDL_FINGER_UP = 1;
+		static final int SDL_FINGER_MOVE = 2;
+
 		public void process(final MotionEvent event)
 		{
 			int action = -1;
 
+			//System.out.println("Got motion event, type " + (int)(event.getAction()) + " X " + (int)event.getX() + " Y " + (int)event.getY());
 			if( event.getAction() == MotionEvent.ACTION_UP )
 			{
-				action = 1;
+				action = SDL_FINGER_UP;
 				for( int i = 0; i < touchEventMax; i++ )
 				{
 					if( touchEvents[i].down )
@@ -126,7 +159,7 @@ abstract class DifferentTouchInput
 			}
 			if( event.getAction() == MotionEvent.ACTION_DOWN )
 			{
-				action = 0;
+				action = SDL_FINGER_DOWN;
 				for( int i = 0; i < event.getPointerCount(); i++ )
 				{
 					int id = event.getPointerId(i);
@@ -137,10 +170,9 @@ abstract class DifferentTouchInput
 					touchEvents[id].y = (int)event.getY(i);
 					touchEvents[id].pressure = (int)(event.getPressure(i) * 1000.0);
 					touchEvents[id].size = (int)(event.getSize(i) * 1000.0);
-					DemoGLSurfaceView.nativeMouse( touchEvents[i].x, touchEvents[i].y, action, id, touchEvents[i].pressure, touchEvents[i].size );
+					DemoGLSurfaceView.nativeMouse( touchEvents[id].x, touchEvents[id].y, action, id, touchEvents[id].pressure, touchEvents[id].size );
 				}
 			}
-
 			if( event.getAction() == MotionEvent.ACTION_MOVE )
 			{
 				for( int i = 0; i < touchEventMax; i++ )
@@ -156,36 +188,49 @@ abstract class DifferentTouchInput
 						// Up event
 						if( touchEvents[i].down )
 						{
-							action = 1;
+							action = SDL_FINGER_UP;
 							touchEvents[i].down = false;
 							DemoGLSurfaceView.nativeMouse( touchEvents[i].x, touchEvents[i].y, action, i, touchEvents[i].pressure, touchEvents[i].size );
 						}
 					}
 					else
 					{
-						int id = event.getPointerId(ii);
-						if( id >= touchEventMax )
-							id = touchEventMax-1;
-						if( touchEvents[id].down )
-							action = 2;
+						if( touchEvents[i].down )
+							action = SDL_FINGER_MOVE;
 						else
-							action = 0;
-						touchEvents[id].down = true;
-						touchEvents[id].x = (int)event.getX(i);
-						touchEvents[id].y = (int)event.getY(i);
-						touchEvents[id].pressure = (int)(event.getPressure(i) * 1000.0);
-						touchEvents[id].size = (int)(event.getSize(i) * 1000.0);
-						DemoGLSurfaceView.nativeMouse( touchEvents[i].x, touchEvents[i].y, action, id, touchEvents[i].pressure, touchEvents[i].size );
+							action = SDL_FINGER_DOWN;
+						touchEvents[i].down = true;
+						touchEvents[i].x = (int)event.getX(ii);
+						touchEvents[i].y = (int)event.getY(ii);
+						touchEvents[i].pressure = (int)(event.getPressure(ii) * 1000.0);
+						touchEvents[i].size = (int)(event.getSize(ii) * 1000.0);
+						DemoGLSurfaceView.nativeMouse( touchEvents[i].x, touchEvents[i].y, action, i, touchEvents[i].pressure, touchEvents[i].size );
 					}
 				}
+			}
+			if( event.getAction() == MotionEvent.ACTION_HOVER_MOVE ) // Support bluetooth/USB mouse - available since Android 3.1
+			{
+				// TODO: it is possible that multiple pointers return that event, but we're handling only pointer #0
+				// TODO: need to check this on a device, the emulator does not return such event
+				if( touchEvents[0].down )
+					action = SDL_FINGER_UP;
+				else
+					action = SDL_FINGER_MOVE;
+				action = 2;
+				touchEvents[0].down = false;
+				touchEvents[0].x = (int)event.getX();
+				touchEvents[0].y = (int)event.getY();
+				touchEvents[0].pressure = 0;
+				touchEvents[0].size = 0;
+				DemoGLSurfaceView.nativeMouse( touchEvents[0].x, touchEvents[0].y, action, 0, touchEvents[0].pressure, touchEvents[0].size );
 			}
 		}
 	}
 }
 
 
-class DemoRenderer extends GLSurfaceView_SDL.Renderer {
-
+class DemoRenderer extends GLSurfaceView_SDL.Renderer
+{
 	public DemoRenderer(MainActivity _context)
 	{
 		context = _context;
@@ -200,6 +245,8 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 	}
 
 	public void onSurfaceChanged(GL10 gl, int w, int h) {
+		mWidth = w;
+		mHeight = h;
 		nativeResize(w, h, Globals.KeepAspectRatio ? 1 : 0);
 	}
 	
@@ -283,9 +330,71 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 		context.runOnUiThread(cb);
 	}
 
-	public void exitApp() {
+	public void exitApp()
+	{
 		 nativeDone();
 	};
+
+	private int PowerOf2(int i)
+	{
+		int value = 1;
+		while (value < i)
+			value <<= 1;
+		return value;
+	}
+	public void DrawLogo(GL10 gl)
+	{
+		BitmapDrawable bmp = null;
+		try
+		{
+			bmp = new BitmapDrawable(context.getAssets().open("logo.png"));
+		}
+		catch(Exception e)
+		{
+			bmp = new BitmapDrawable(context.getResources().openRawResource(R.drawable.publisherlogo));
+		}
+		int width = bmp.getBitmap().getWidth();
+		int height = bmp.getBitmap().getHeight();
+		ByteBuffer byteBuffer = ByteBuffer.allocateDirect(4 * width * height);
+		byteBuffer.order(ByteOrder.BIG_ENDIAN);
+		bmp.getBitmap().copyPixelsToBuffer(byteBuffer);
+		byteBuffer.position(0);
+
+		gl.glViewport(0, 0, mWidth, mHeight);
+		gl.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT);
+		gl.glColor4x(0x10000, 0x10000, 0x10000, 0x10000);
+		gl.glPixelStorei(gl.GL_UNPACK_ALIGNMENT, 1);
+		gl.glEnable(GL10.GL_TEXTURE_2D);
+		int textureName = -1;
+		int mTextureNameWorkspace[] = new int[1];
+		int mCropWorkspace[] = new int[4];
+		gl.glGenTextures(1, mTextureNameWorkspace, 0);
+		textureName = mTextureNameWorkspace[0];
+		gl.glBindTexture(GL10.GL_TEXTURE_2D, textureName);
+		gl.glActiveTexture(textureName);
+		gl.glClientActiveTexture(textureName);
+		gl.glTexImage2D(GL10.GL_TEXTURE_2D, 0, GL10.GL_RGBA,
+				PowerOf2(width), PowerOf2(height), 0,
+				GL10.GL_RGBA, GL10.GL_UNSIGNED_BYTE, null);
+		gl.glTexSubImage2D(GL10.GL_TEXTURE_2D, 0, 0, 0,
+				width, height,
+				GL10.GL_RGBA, GL10.GL_UNSIGNED_BYTE, byteBuffer);
+		mCropWorkspace[0] = 0; // u
+		mCropWorkspace[1] = height; // v
+		mCropWorkspace[2] = width;
+		mCropWorkspace[3] = -height;
+		((GL11) gl).glTexParameteriv(GL10.GL_TEXTURE_2D,
+				GL11Ext.GL_TEXTURE_CROP_RECT_OES, mCropWorkspace, 0);
+		((GL11Ext) gl).glDrawTexiOES(0, -mHeight, 0, mWidth, mHeight);
+		gl.glActiveTexture(0);
+		gl.glClientActiveTexture(0);
+		gl.glBindTexture(GL10.GL_TEXTURE_2D, 0);
+		gl.glDeleteTextures(1, mTextureNameWorkspace, 0);
+
+		gl.glFlush();
+	}
+
 
 	private native void nativeInitJavaCallbacks();
 	private native void nativeInit(String CurrentPath, String CommandLine, int multiThreadedVideo);
@@ -307,6 +416,8 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer {
 	public boolean mGlSurfaceCreated = false;
 	public boolean mPaused = false;
 	private boolean mFirstTimeStart = true;
+	public int mWidth = 0;
+	public int mHeight = 0;
 }
 
 class DemoGLSurfaceView extends GLSurfaceView_SDL {
@@ -334,6 +445,12 @@ class DemoGLSurfaceView extends GLSurfaceView_SDL {
 		return true;
 	};
 
+	@Override
+	public boolean onGenericMotionEvent (final MotionEvent ev)
+	{
+		return onTouchEvent(ev);
+	}
+
 	public void exitApp() {
 		mRenderer.exitApp();
 	};
@@ -357,24 +474,27 @@ class DemoGLSurfaceView extends GLSurfaceView_SDL {
 			mRenderer.nativeGlContextRecreated();
 	};
 
+	// This seems like redundant code - it handled in MainActivity.java
 	@Override
 	public boolean onKeyDown(int keyCode, final KeyEvent event) {
-		 nativeKey( keyCode, 1 );
-		 return true;
-	 }
+		if( nativeKey( keyCode, 1 ) == 0 )
+				return super.onKeyDown(keyCode, event);
+		return true;
+	}
 	
 	@Override
 	public boolean onKeyUp(int keyCode, final KeyEvent event) {
-		 nativeKey( keyCode, 0 );
-		 return true;
-	 }
+		if( nativeKey( keyCode, 0 ) == 0 )
+				return super.onKeyUp(keyCode, event);
+		return true;
+	}
 
 	DemoRenderer mRenderer;
 	MainActivity mParent;
 	DifferentTouchInput touchInput = null;
 
 	public static native void nativeMouse( int x, int y, int action, int pointerId, int pressure, int radius );
-	public static native void nativeKey( int keyCode, int down );
+	public static native int nativeKey( int keyCode, int down );
 	public static native void initJavaCallbacks();
 
 }
