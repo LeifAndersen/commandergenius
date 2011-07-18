@@ -1,30 +1,22 @@
 /*
-    SDL - Simple DirectMedia Layer
-    Copyright (C) 1997-2011 Sam Lantinga
-    Java source code (C) 2009-2011 Sergii Pylypenko
+Simple DirectMedia Layer
+Java source code (C) 2009-2011 Sergii Pylypenko
+  
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
-
-    There is a license exception for this particular file (Settings.java) -
-    you may modify it as you wish without releasing source code,
-    as long as the libraries in the binary package you're distributing
-    (typically libapplication.so and other closed-source libraries in your .apk file)
-    can be linked and executed without error against the SDL compiled
-    from the original source code. This implies that you may not modify Java-to-C
-    interface, otherwise you have to publish the source code with your changes.
-
-    This exception is here to permit you to replace a rather awkward SDL startup config dialog
-    with your own user-friendly version, possibly with lesser options and some help on them.
-    Also you may put your own logo in the startup screen instead of the "Powered by SDL" logo.
-
-    You may modify other Java files if needed to implement your custom startup config dialog
-    without publishing the source code, to a reasonable extent of course - if your modification
-    will make SDL work better, faster or more stable beyond the startup config dialog -
-    you still have to publish the source code with such change (and I don't care about
-    changes which will make SDL work worse, slower or less stable, you may keep them).
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+  
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required. 
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 */
 
 package net.sourceforge.clonekeenplus;
@@ -149,6 +141,7 @@ class Settings
 			out.writeInt(Globals.OptionalDataDownload.length);
 			for(int i = 0; i < Globals.OptionalDataDownload.length; i++)
 				out.writeBoolean(Globals.OptionalDataDownload[i]);
+			out.writeBoolean(Globals.BrokenLibCMessageShown);
 
 			out.close();
 			settingsLoaded = true;
@@ -283,6 +276,7 @@ class Settings
 			Globals.OptionalDataDownload = new boolean[settingsFile.readInt()];
 			for(int i = 0; i < Globals.OptionalDataDownload.length; i++)
 				Globals.OptionalDataDownload[i] = settingsFile.readBoolean();
+			Globals.BrokenLibCMessageShown = settingsFile.readBoolean();
 			
 			settingsLoaded = true;
 
@@ -394,9 +388,67 @@ class Settings
 
 	static ArrayList<Menu> menuStack = new ArrayList<Menu> ();
 
-	public static void showConfig(final MainActivity p, boolean firstStart)
+	public static void showConfig(final MainActivity p, final boolean firstStart)
 	{
 		settingsChanged = true;
+		if( !Globals.BrokenLibCMessageShown )
+		{
+			Globals.BrokenLibCMessageShown = true;
+			try {
+				InputStream in = p.getAssets().open("stdout-test");
+				File outDir = p.getFilesDir();
+				try {
+					outDir.mkdirs();
+				} catch( SecurityException ee ) { };
+				
+				byte[] buf = new byte[16384];
+				OutputStream out = null;
+				String path = outDir.getAbsolutePath() + "/" + "stdout-test";
+
+				out = new FileOutputStream( path );
+				int len = in.read(buf);
+				while (len >= 0)
+				{
+					if(len > 0)
+						out.write(buf, 0, len);
+					len = in.read(buf);
+				}
+
+				out.flush();
+				out.close();
+				Settings.nativeChmod(path, 0755);
+				if( (new ProcessBuilder().command(path).start()).waitFor() != 42 )
+				{
+					System.out.println("libSDL: stdout-test FAILED, your libc is broken");
+					AlertDialog.Builder builder = new AlertDialog.Builder(p);
+					builder.setTitle(p.getResources().getString(R.string.broken_libc_title));
+					builder.setMessage(p.getResources().getString(R.string.broken_libc_text));
+					builder.setPositiveButton(p.getResources().getString(R.string.ok), new DialogInterface.OnClickListener()
+					{
+						public void onClick(DialogInterface dialog, int item) 
+						{
+							dialog.dismiss();
+							showConfig(p, firstStart);
+						}
+					});
+					builder.setOnCancelListener(new DialogInterface.OnCancelListener()
+					{
+						public void onCancel(DialogInterface dialog)
+						{
+							dialog.dismiss();
+							showConfig(p, firstStart);
+						}
+					});
+					AlertDialog alert = builder.create();
+					alert.setOwnerActivity(p);
+					alert.show();
+					return;
+				}
+				System.out.println("libSDL: stdout-test passed, your libc seems to be good");
+			} catch ( Exception eeee ) {
+				System.out.println("libSDL: Cannot run stdout-test: " + eeee.toString());
+			}
+		}
 
 		if( Globals.OptionalDataDownload == null )
 		{
@@ -2188,7 +2240,7 @@ class Settings
 				Globals.SmoothVideo
 			};
 
-			if(Globals.SwVideoMode)
+			if(Globals.SwVideoMode && !Globals.CompatibilityHacks)
 			{
 				CharSequence[] items2 = {
 					p.getResources().getString(R.string.pointandclick_keepaspectratio),
@@ -2263,6 +2315,12 @@ class Settings
 	{
 		if(Globals.SmoothVideo)
 			nativeSetSmoothVideo();
+		if( Globals.CompatibilityHacks )
+		{
+			Globals.MultiThreadedVideo = true;
+			Globals.SwVideoMode = true;
+			nativeSetCompatibilityHacks();
+		}
 		if( Globals.SwVideoMode && Globals.MultiThreadedVideo )
 			nativeSetVideoMultithreaded();
 		if( Globals.PhoneHasTrackball )
@@ -2386,6 +2444,7 @@ class Settings
 	private static native void nativeSetMultitouchUsed();
 	private static native void nativeSetTouchscreenKeyboardUsed();
 	private static native void nativeSetSmoothVideo();
+	private static native void nativeSetCompatibilityHacks();
 	private static native void nativeSetVideoMultithreaded();
 	private static native void nativeSetupScreenKeyboard(int size, int theme, int nbuttonsAutoFire, int transparency);
 	private static native void nativeSetupScreenKeyboardButtons(byte[] img);
@@ -2401,5 +2460,6 @@ class Settings
 	private static native void nativeSetMultitouchGestureSensitivity(int sensitivity);
 	private static native void nativeSetTouchscreenCalibration(int x1, int y1, int x2, int y2);
 	public static native void  nativeSetEnv(final String name, final String value);
+	public static native int   nativeChmod(final String name, int mode);
 }
 

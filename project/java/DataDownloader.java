@@ -1,12 +1,22 @@
 /*
-    SDL - Simple DirectMedia Layer
-    Copyright (C) 1997-2011 Sam Lantinga
-    Java source code (C) 2009-2011 Sergii Pylypenko
+Simple DirectMedia Layer
+Java source code (C) 2009-2011 Sergii Pylypenko
+  
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+  
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required. 
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 */
 
 package net.sourceforge.clonekeenplus;
@@ -230,7 +240,9 @@ class DataDownloader extends Thread
 		// Create output directory (not necessary for phone storage)
 		System.out.println("Downloading data to: '" + outFilesDir + "'");
 		try {
-			(new File( outFilesDir )).mkdirs();
+			File outDir = new File( outFilesDir );
+			if( !(outDir.exists() && outDir.isDirectory()) )
+				outDir.mkdirs();
 			OutputStream out = new FileOutputStream( getOutFilePath(".nomedia") );
 			out.flush();
 			out.close();
@@ -294,19 +306,12 @@ class DataDownloader extends Thread
 		}
 		if( FileInAssets )
 		{
-			System.out.println("Unpacking from assets: '" + url + "'");
 			try {
-				System.out.println("Unpacking from assets: '" + url + "' 1");
 				stream = new CountingInputStream(Parent.getAssets().open(url), 8192);
-				System.out.println("Unpacking from assets: '" + url + "' 2");
 				while( stream.skip(65536) > 0 ) { };
-				System.out.println("Unpacking from assets: '" + url + "' 3");
 				totalLen = stream.getBytesRead();
-				System.out.println("Unpacking from assets: '" + url + "' 4 totalLen = " + String.valueOf(totalLen));
 				stream.close();
-				System.out.println("Unpacking from assets: '" + url + "' 5");
 				stream = new CountingInputStream(Parent.getAssets().open(url), 8192);
-				System.out.println("Unpacking from assets: '" + url + "' 6");
 			} catch( IOException e ) {
 				System.out.println("Unpacking from assets '" + url + "' - error: " + e.toString());
 				Status.setText( res.getString(R.string.error_dl_from, url) );
@@ -340,7 +345,9 @@ class DataDownloader extends Thread
 			OutputStream out = null;
 			try {
 				try {
-					(new File( path.substring(0, path.lastIndexOf("/") ))).mkdirs();
+					File outDir = new File( path.substring(0, path.lastIndexOf("/") ));
+					if( !(outDir.exists() && outDir.isDirectory()) )
+						outDir.mkdirs();
 				} catch( SecurityException e ) { };
 
 				out = new FileOutputStream( path );
@@ -405,7 +412,9 @@ class DataDownloader extends Thread
 				{
 					System.out.println("Creating dir '" + getOutFilePath(entry.getName()) + "'");
 					try {
-						(new File( getOutFilePath(entry.getName()) )).mkdirs();
+						File outDir = new File( getOutFilePath(entry.getName()) );
+						if( !(outDir.exists() && outDir.isDirectory()) )
+							outDir.mkdirs();
 					} catch( SecurityException e ) { };
 					continue;
 				}
@@ -416,7 +425,9 @@ class DataDownloader extends Thread
 				System.out.println("Saving file '" + path + "'");
 
 				try {
-					(new File( path.substring(0, path.lastIndexOf("/") ))).mkdirs();
+					File outDir = new File( path.substring(0, path.lastIndexOf("/") ));
+					if( !(outDir.exists() && outDir.isDirectory()) )
+						outDir.mkdirs();
 				} catch( SecurityException e ) { };
 				
 				try {
@@ -431,9 +442,7 @@ class DataDownloader extends Thread
 					}
 					System.out.println("File '" + path + "' exists and passed CRC check - not overwriting it");
 					continue;
-				} catch( Exception e )
-				{
-				}
+				} catch( Exception e ) { }
 
 				try {
 					out = new FileOutputStream( path );

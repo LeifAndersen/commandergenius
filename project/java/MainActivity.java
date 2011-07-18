@@ -1,12 +1,22 @@
 /*
-    SDL - Simple DirectMedia Layer
-    Copyright (C) 1997-2011 Sam Lantinga
-    Java source code (C) 2009-2011 Sergii Pylypenko
+Simple DirectMedia Layer
+Java source code (C) 2009-2011 Sergii Pylypenko
+  
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+  
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required. 
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 */
 
 package net.sourceforge.clonekeenplus;
@@ -43,6 +53,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.FileOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.util.zip.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 import android.text.SpannedString;
@@ -496,12 +508,19 @@ public class MainActivity extends Activity {
 					}
 					if( entry.isDirectory() )
 					{
-						System.out.println("Warning '" + entry.getName() + "' is a directory");
+						File outDir = new File( cacheDir.getAbsolutePath() + "/" + entry.getName() );
+						if( !(outDir.exists() && outDir.isDirectory()) )
+							outDir.mkdirs();
 						continue;
 					}
 
 					OutputStream out = null;
 					String path = cacheDir.getAbsolutePath() + "/" + entry.getName();
+					try {
+						File outDir = new File( path.substring(0, path.lastIndexOf("/") ));
+						if( !(outDir.exists() && outDir.isDirectory()) )
+							outDir.mkdirs();
+					} catch( SecurityException eeeee ) { };
 
 					System.out.println("Saving to file '" + path + "'");
 
@@ -529,9 +548,104 @@ public class MainActivity extends Activity {
 			}
 			catch ( Exception ee )
 			{
-				System.out.println("libSDL: Error: " + e.toString());
+				System.out.println("libSDL: Error: " + ee.toString());
 			}
 		}
+
+		// ----- VCMI hack -----
+			try {
+				//System.out.println("libSDL: Extracting VCMI server");
+				
+				InputStream in = null;
+				try
+				{
+					for( int i = 0; ; i++ )
+					{
+						InputStream in2 = getAssets().open("vcmiserver" + String.valueOf(i));
+						if( in == null )
+							in = in2;
+						else
+							in = new SequenceInputStream( in, in2 );
+					}
+				}
+				catch( IOException ee ) { }
+
+				if( in == null )
+					throw new RuntimeException("libSDL: Extracting VCMI server failed, the .apk file packaged incorrectly");
+
+				ZipInputStream zip = new ZipInputStream(in);
+
+				File cacheDir = getFilesDir();
+				try {
+					cacheDir.mkdirs();
+				} catch( SecurityException ee ) { };
+				
+				byte[] buf = new byte[16384];
+				while(true)
+				{
+					ZipEntry entry = null;
+					entry = zip.getNextEntry();
+					/*
+					if( entry != null )
+						System.out.println("Extracting lib " + entry.getName());
+					*/
+					if( entry == null )
+					{
+						System.out.println("Extracting libs finished");
+						break;
+					}
+					if( entry.isDirectory() )
+					{
+						File outDir = new File( cacheDir.getAbsolutePath() + "/" + entry.getName() );
+						if( !(outDir.exists() && outDir.isDirectory()) )
+							outDir.mkdirs();
+						continue;
+					}
+
+					OutputStream out = null;
+					String path = cacheDir.getAbsolutePath() + "/" + entry.getName();
+					try {
+						File outDir = new File( path.substring(0, path.lastIndexOf("/") ));
+						if( !(outDir.exists() && outDir.isDirectory()) )
+							outDir.mkdirs();
+					} catch( SecurityException eeeeeee ) { };
+
+					try {
+						CheckedInputStream check = new CheckedInputStream( new FileInputStream(path), new CRC32() );
+						while( check.read(buf, 0, buf.length) > 0 ) {};
+						check.close();
+						if( check.getChecksum().getValue() != entry.getCrc() )
+						{
+							File ff = new File(path);
+							ff.delete();
+							throw new Exception();
+						}
+						System.out.println("File '" + path + "' exists and passed CRC check - not overwriting it");
+						continue;
+					} catch( Exception eeeeee ) { }
+
+					System.out.println("Saving to file '" + path + "'");
+
+					out = new FileOutputStream( path );
+					int len = zip.read(buf);
+					while (len >= 0)
+					{
+						if(len > 0)
+							out.write(buf, 0, len);
+						len = zip.read(buf);
+					}
+
+					out.flush();
+					out.close();
+					Settings.nativeChmod(path, 0755);
+				}
+			}
+			catch ( Exception eee )
+			{
+				//System.out.println("libSDL: Error: " + eee.toString());
+			}
+		// ----- VCMI hack -----
+
 	};
 
 	public FrameLayout getVideoLayout() { return _videoLayout; }

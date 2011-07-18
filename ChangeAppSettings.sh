@@ -2,6 +2,7 @@
 
 CHANGE_APP_SETTINGS_VERSION=17
 AUTO=
+CHANGED=
 
 if [ "X$1" = "X-a" ]; then
 	AUTO=a
@@ -29,6 +30,7 @@ echo -n "libSDL version to use (1.2 or 1.3) ($LibSdlVersion): "
 read var
 if [ -n "$var" ] ; then
 	LibSdlVersion="$var"
+	CHANGED=1
 fi
 fi
 
@@ -38,6 +40,7 @@ echo -n "Specify application name (e.x. My Application) ($AppName): "
 read var
 if [ -n "$var" ] ; then
 	AppName="$var"
+	CHANGED=1
 fi
 fi
 
@@ -47,6 +50,7 @@ echo -n "Specify reversed site name of application (e.x. com.mysite.myapp) ($App
 read var
 if [ -n "$var" ] ; then
 	AppFullName="$var"
+	CHANGED=1
 fi
 fi
 
@@ -56,6 +60,7 @@ echo -n "Specify screen orientation: (v)ertical or (h)orizontal ($ScreenOrientat
 read var
 if [ -n "$var" ] ; then
 	ScreenOrientation="$var"
+	CHANGED=1
 fi
 fi
 
@@ -86,6 +91,7 @@ while true; do
 done
 if [ -n "$AppDataDownloadUrl1" ] ; then
 	AppDataDownloadUrl="$AppDataDownloadUrl1"
+	CHANGED=1
 fi
 fi
 
@@ -95,6 +101,7 @@ echo "Application window should be resized to fit into native device screen (480
 read var
 if [ -n "$var" ] ; then
 	SdlVideoResize="$var"
+	CHANGED=1
 fi
 fi
 
@@ -104,6 +111,7 @@ echo -n "Application resizing should use 4:3 aspect ratio, creating black bars (
 read var
 if [ -n "$var" ] ; then
 	SdlVideoResizeKeepAspect="$var"
+	CHANGED=1
 fi
 fi
 
@@ -113,18 +121,34 @@ echo -n "Enable OpenGL depth buffer (needed only for 3-d applications, small spe
 read var
 if [ -n "$var" ] ; then
 	NeedDepthBuffer="$var"
+	CHANGED=1
 fi
 fi
 
 if [ "$LibSdlVersion" = "1.2" ]; then
-	if [ -z "$SwVideoMode" -o -z "$AUTO" ]; then
-	echo
-	echo "Application uses software video buffer - you're calling SDL_SetVideoMode() without SDL_HWSURFACE and without SDL_OPENGL,"
-	echo -n "this will allow small speed optimization (y) or (n) ($SwVideoMode): "
-	read var
-	if [ -n "$var" ] ; then
-		SwVideoMode="$var"
+	if [ -z "$CompatibilityHacks" -o -z "$AUTO" ]; then
+		echo
+		echo "Application does not call SDL_Flip() or SDL_UpdateRects() appropriately, or draws from non-main thread -"
+		echo -n "enabling the compatibility mode will force screen update every halfsecond (y) or (n) ($CompatibilityHacks): "
+		read var
+		if [ -n "$var" ] ; then
+			CompatibilityHacks="$var"
+			CHANGED=1
+		fi
 	fi
+	if [ "$CompatibilityHacks" = y ]; then
+		SwVideoMode=y
+	else
+		if [ -z "$SwVideoMode" -o -z "$AUTO" ]; then
+			echo
+			echo "Application uses software video buffer - you're calling SDL_SetVideoMode() without SDL_HWSURFACE and without SDL_OPENGL,"
+			echo -n "this will allow small speed optimization (y) or (n) ($SwVideoMode): "
+			read var
+			if [ -n "$var" ] ; then
+				SwVideoMode="$var"
+				CHANGED=1
+			fi
+		fi
 	fi
 else
 	SwVideoMode=n
@@ -136,6 +160,7 @@ echo -n "Application uses mouse (y) or (n) ($AppUsesMouse): "
 read var
 if [ -n "$var" ] ; then
 	AppUsesMouse="$var"
+	CHANGED=1
 fi
 fi
 
@@ -145,6 +170,7 @@ echo -n "Application needs two-button mouse, will also enable advanced point-and
 read var
 if [ -n "$var" ] ; then
 	AppNeedsTwoButtonMouse="$var"
+	CHANGED=1
 fi
 fi
 
@@ -155,6 +181,7 @@ echo -n "will be used as arrow keys if phone does not have dpad/trackball ($AppN
 read var
 if [ -n "$var" ] ; then
 	AppNeedsArrowKeys="$var"
+	CHANGED=1
 fi
 fi
 
@@ -164,6 +191,7 @@ echo -n "Application needs text input (y) or (n), enables button for text input 
 read var
 if [ -n "$var" ] ; then
 	AppNeedsTextInput="$var"
+	CHANGED=1
 fi
 fi
 
@@ -175,6 +203,7 @@ echo -n "make sure you can navigate all app menus with joystick or mouse ($AppUs
 read var
 if [ -n "$var" ] ; then
 	AppUsesJoystick="$var"
+	CHANGED=1
 fi
 fi
 
@@ -185,6 +214,7 @@ echo -n "SDL will send raw accelerometer data and won't show 'Accelerometer sens
 read var
 if [ -n "$var" ] ; then
 	AppHandlesJoystickSensitivity="$var"
+	CHANGED=1
 fi
 fi
 
@@ -195,6 +225,7 @@ echo -n "or additionally as SDL_FINGERDOWN/UP/MOTION events in SDL 1.3, with SDL
 read var
 if [ -n "$var" ] ; then
 	AppUsesMultitouch="$var"
+	CHANGED=1
 fi
 fi
 
@@ -206,6 +237,7 @@ echo -n "rigth after SDL_Flip(), if (n) then SDL_Flip() will block till app in b
 read var
 if [ -n "$var" ] ; then
 	NonBlockingSwapBuffers="$var"
+	CHANGED=1
 fi
 fi
 
@@ -216,6 +248,7 @@ echo -n "applied automatically if you're using accelerometer, but may be useful 
 read var
 if [ -n "$var" ] ; then
 	InhibitSuspend="$var"
+	CHANGED=1
 fi
 fi
 
@@ -231,6 +264,7 @@ echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	RedefinedKeys="$var"
+	CHANGED=1
 fi
 fi
 
@@ -240,6 +274,7 @@ echo -n "Number of virtual keyboard keys (currently 7 is maximum) ($AppTouchscre
 read var
 if [ -n "$var" ] ; then
 	AppTouchscreenKeyboardKeysAmount="$var"
+	CHANGED=1
 fi
 fi
 
@@ -249,12 +284,14 @@ echo -n "Number of virtual keyboard keys that support autofire (currently 2 is m
 read var
 if [ -n "$var" ] ; then
 	AppTouchscreenKeyboardKeysAmountAutoFire="$var"
+	CHANGED=1
 fi
 fi
 
 if [ -z "$RedefinedKeysScreenKb" -o -z "$AUTO" ]; then
 if [ -z "$RedefinedKeysScreenKb" ]; then
 	RedefinedKeysScreenKb="$RedefinedKeys"
+	CHANGED=1
 fi
 echo
 echo "Redefine on-screen keyboard keys to SDL keysyms - 6 keyboard keys + 4 multitouch gestures (zoom in/out and rotate left/right)"
@@ -263,6 +300,7 @@ echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	RedefinedKeysScreenKb="$var"
+	CHANGED=1
 fi
 fi
 
@@ -272,10 +310,11 @@ echo -n "How long to show startup menu button, in msec, 0 to disable startup men
 read var
 if [ -n "$var" ] ; then
 	StartupMenuButtonTimeout="$var"
+	CHANGED=1
 fi
 fi
 
-if [ -z "$HiddenMenuOptions" -o -z "$AUTO" ]; then
+if [ -z "$AUTO" ]; then
 echo
 echo "Menu items to hide from startup menu, available menu items:"
 echo `grep 'extends Menu' project/java/Settings.java | sed 's/.* class \(.*\) extends .*/\1/'`
@@ -284,6 +323,23 @@ echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	HiddenMenuOptions="$var"
+	CHANGED=1
+fi
+fi
+
+FirstStartMenuOptionsDefault='(AppUsesMouse ? new Settings.DisplaySizeConfig(true) : new Settings.DummyMenu()), new Settings.OptionalDownloadConfig(true)'
+if [ -z "$AUTO" ]; then
+echo
+echo "Menu items to show at startup - this is Java code snippet, leave empty for default"
+echo $FirstStartMenuOptionsDefault
+echo "Available menu items:"
+echo `grep 'extends Menu' project/java/Settings.java | sed 's/.* class \(.*\) extends .*/new Settings.\1(), /'`
+echo "Current value: " "$FirstStartMenuOptions"
+echo -n ": "
+read var
+if [ -n "$var" ] ; then
+	FirstStartMenuOptions="$var"
+	CHANGED=1
 fi
 fi
 
@@ -294,6 +350,7 @@ echo -n "it will also work on old devices, but .apk size is 2x bigger (y) or (n)
 read var
 if [ -n "$var" ] ; then
 	MultiABI="$var"
+	CHANGED=1
 fi
 fi
 
@@ -303,6 +360,7 @@ echo -n "Application version code (integer) ($AppVersionCode): "
 read var
 if [ -n "$var" ] ; then
 	AppVersionCode="$var"
+	CHANGED=1
 fi
 fi
 
@@ -312,6 +370,7 @@ echo -n "Application user-visible version name (string) ($AppVersionName): "
 read var
 if [ -n "$var" ] ; then
 	AppVersionName="$var"
+	CHANGED=1
 fi
 fi
 
@@ -321,6 +380,7 @@ echo -n "Application uses custom build script AndroidBuild.sh instead of Android
 read var
 if [ -n "$var" ] ; then
 	CustomBuildScript="$var"
+	CHANGED=1
 fi
 fi
 
@@ -330,6 +390,7 @@ echo -n "Aditional CFLAGS for application ($AppCflags): "
 read var
 if [ -n "$var" ] ; then
 	AppCflags="$var"
+	CHANGED=1
 fi
 fi
 
@@ -344,6 +405,7 @@ echo -n ": "
 read var
 if [ -n "$var" ] ; then
 	CompiledLibraries="$var"
+	CHANGED=1
 fi
 fi
 
@@ -353,6 +415,7 @@ echo -n "Additional LDFLAGS for application ($AppLdflags): "
 read var
 if [ -n "$var" ] ; then
 	AppLdflags="$var"
+	CHANGED=1
 fi
 fi
 
@@ -362,6 +425,7 @@ echo -n "Build only following subdirs (empty will build all dirs, ignored with c
 read var
 if [ -n "$var" ] ; then
 	AppSubdirsBuild="$var"
+	CHANGED=1
 fi
 fi
 
@@ -371,6 +435,7 @@ echo -n "Application command line parameters, including app name as 0-th param (
 read var
 if [ -n "$var" ] ; then
 	AppCmdline="$var"
+	CHANGED=1
 fi
 fi
 
@@ -395,11 +460,13 @@ while true; do
 done
 if [ -n "$ReadmeText1" ] ; then
 	ReadmeText="$ReadmeText1"
+	CHANGED=1
 fi
 fi
 
 echo
 
+if [ -n "$CHANGED" ]; then
 cat /dev/null > AndroidAppSettings.cfg
 echo "# The application settings for Android libSDL port" >> AndroidAppSettings.cfg
 echo AppSettingVersion=$CHANGE_APP_SETTINGS_VERSION >> AndroidAppSettings.cfg
@@ -413,6 +480,7 @@ echo SdlVideoResize=$SdlVideoResize >> AndroidAppSettings.cfg
 echo SdlVideoResizeKeepAspect=$SdlVideoResizeKeepAspect >> AndroidAppSettings.cfg
 echo NeedDepthBuffer=$NeedDepthBuffer >> AndroidAppSettings.cfg
 echo SwVideoMode=$SwVideoMode >> AndroidAppSettings.cfg
+echo CompatibilityHacks=$CompatibilityHacks >> AndroidAppSettings.cfg
 echo AppUsesMouse=$AppUsesMouse >> AndroidAppSettings.cfg
 echo AppNeedsTwoButtonMouse=$AppNeedsTwoButtonMouse >> AndroidAppSettings.cfg
 echo AppNeedsArrowKeys=$AppNeedsArrowKeys >> AndroidAppSettings.cfg
@@ -427,6 +495,7 @@ echo AppTouchscreenKeyboardKeysAmountAutoFire=$AppTouchscreenKeyboardKeysAmountA
 echo RedefinedKeysScreenKb=\"$RedefinedKeysScreenKb\" >> AndroidAppSettings.cfg
 echo StartupMenuButtonTimeout=$StartupMenuButtonTimeout >> AndroidAppSettings.cfg
 echo HiddenMenuOptions=\'$HiddenMenuOptions\' >> AndroidAppSettings.cfg
+echo FirstStartMenuOptions=\'$FirstStartMenuOptions\' >> AndroidAppSettings.cfg
 echo MultiABI=$MultiABI >> AndroidAppSettings.cfg
 echo AppVersionCode=$AppVersionCode >> AndroidAppSettings.cfg
 echo AppVersionName=\"$AppVersionName\" >> AndroidAppSettings.cfg
@@ -437,6 +506,7 @@ echo AppLdflags=\'$AppLdflags\' >> AndroidAppSettings.cfg
 echo AppSubdirsBuild=\'$AppSubdirsBuild\' >> AndroidAppSettings.cfg
 echo AppCmdline=\'$AppCmdline\' >> AndroidAppSettings.cfg
 echo ReadmeText=\'$ReadmeText\' >> AndroidAppSettings.cfg
+fi
 
 AppShortName=`echo $AppName | sed 's/ //g'`
 DataPath="$AppFullName"
@@ -485,6 +555,12 @@ if [ "$SwVideoMode" = "y" ] ; then
 	SwVideoMode=true
 else
 	SwVideoMode=false
+fi
+
+if [ "$CompatibilityHacks" = "y" ] ; then
+	CompatibilityHacks=true
+else
+	CompatibilityHacks=false
 fi
 
 if [ "$AppUsesMouse" = "y" ] ; then
@@ -573,6 +649,10 @@ for F in $HiddenMenuOptions; do
 	HiddenMenuOptions1="$HiddenMenuOptions1 new Settings.$F(),"
 done
 
+if [ -z "$FirstStartMenuOptions" ]; then
+	FirstStartMenuOptions="$FirstStartMenuOptionsDefault"
+fi
+
 ReadmeText="`echo $ReadmeText | sed 's/\"/\\\\\\\\\"/g' | sed 's/[&%]//g'`"
 
 echo Patching project/AndroidManifest.xml
@@ -600,6 +680,7 @@ cat project/src/Globals.java | \
 	sed "s@public static String DataDownloadUrl = .*@public static String DataDownloadUrl = \"$AppDataDownloadUrl1\";@" | \
 	sed "s/public static boolean NeedDepthBuffer = .*;/public static boolean NeedDepthBuffer = $NeedDepthBuffer;/" | \
 	sed "s/public static boolean SwVideoMode = .*;/public static boolean SwVideoMode = $SwVideoMode;/" | \
+	sed "s/public static boolean CompatibilityHacks = .*;/public static boolean CompatibilityHacks = $CompatibilityHacks;/" | \
 	sed "s/public static boolean HorizontalOrientation = .*;/public static boolean HorizontalOrientation = $HorizontalOrientation;/" | \
 	sed "s/public static boolean InhibitSuspend = .*;/public static boolean InhibitSuspend = $InhibitSuspend;/" | \
 	sed "s/public static boolean AppUsesMouse = .*;/public static boolean AppUsesMouse = $AppUsesMouse;/" | \
@@ -614,6 +695,7 @@ cat project/src/Globals.java | \
 	sed "s/public static int AppTouchscreenKeyboardKeysAmountAutoFire = .*;/public static int AppTouchscreenKeyboardKeysAmountAutoFire = $AppTouchscreenKeyboardKeysAmountAutoFire;/" | \
 	sed "s/public static int StartupMenuButtonTimeout = .*;/public static int StartupMenuButtonTimeout = $StartupMenuButtonTimeout;/" | \
 	sed "s/public static Settings.Menu HiddenMenuOptions .*;/public static Settings.Menu HiddenMenuOptions [] = { $HiddenMenuOptions1 };/" | \
+	sed "s@public static Settings.Menu FirstStartMenuOptions .*;@public static Settings.Menu FirstStartMenuOptions [] = { $FirstStartMenuOptions };@" | \
 	sed "s%public static String ReadmeText = .*%public static String ReadmeText = \"$ReadmeText\".replace(\"^\",\"\\\n\");%" | \
 	sed "s%public static String CommandLine = .*%public static String CommandLine = \"$AppCmdline\";%" | \
 	sed "s/public static String AppLibraries.*/public static String AppLibraries[] = { $LibrariesToLoad };/" > \
@@ -623,7 +705,7 @@ mv -f project/src/Globals.java.1 project/src/Globals.java
 echo Patching project/jni/Settings.mk
 echo '# DO NOT EDIT THIS FILE - it is automatically generated, edit file SettingsTemplate.mk' > project/jni/Settings.mk
 cat project/jni/SettingsTemplate.mk | \
-	sed "s/APP_MODULES := .*/APP_MODULES := application sdl-$LibSdlVersion sdl_main stlport jpeg png ogg flac vorbis freetype $CompiledLibraries/" | \
+	sed "s/APP_MODULES := .*/APP_MODULES := application sdl-$LibSdlVersion sdl_main stlport jpeg png ogg flac vorbis freetype stdout-test $CompiledLibraries/" | \
 	sed "s/APP_ABI := .*/APP_ABI := $MultiABI/" | \
 	sed "s/SDL_JAVA_PACKAGE_PATH := .*/SDL_JAVA_PACKAGE_PATH := $AppFullNameUnderscored/" | \
 	sed "s^SDL_CURDIR_PATH := .*^SDL_CURDIR_PATH := $DataPath^" | \
@@ -652,17 +734,17 @@ cd ../../..
 echo Cleaning up dependencies
 rm -rf project/libs/* project/gen
 for OUT in obj; do
-rm -rf project/$OUT/local/*/objs/sdl_main/* project/$OUT/local/*/libsdl_main.so
+rm -rf project/$OUT/local/*/objs*/sdl_main/* project/$OUT/local/*/libsdl_main.so
 rm -rf project/$OUT/local/*/libsdl-*.so
-rm -rf project/$OUT/local/*/objs/sdl-*/src/*/android
-rm -rf project/$OUT/local/*/objs/sdl-*/src/video/SDL_video.o
-rm -rf project/$OUT/local/*/objs/sdl-*/SDL_renderer_gles.o
-rm -rf project/$OUT/local/*/libsdl_fake_stdout.a project/$OUT/local/*/objs/sdl_fake_stdout/*
+rm -rf project/$OUT/local/*/objs*/sdl-*/src/*/android
+rm -rf project/$OUT/local/*/objs*/sdl-*/src/video/SDL_video.o
+rm -rf project/$OUT/local/*/objs*/sdl-*/SDL_renderer_gles.o
+rm -rf project/$OUT/local/*/libsdl_fake_stdout.a project/$OUT/local/*/objs*/sdl_fake_stdout/*
 # Do not rebuild several huge libraries that do not depend on SDL version
 for LIB in freetype intl jpeg png lua mad stlport tremor xerces xml2; do
 	for ARCH in armeabi armeabi-v7a; do
-		if [ -e "project/$OUT/local/$ARCH/objs/$LIB" ] ; then
-			find project/$OUT/local/$ARCH/objs/$LIB -name "*.o" | xargs touch -c
+		if [ -e "project/$OUT/local/$ARCH/objs*/$LIB" ] ; then
+			find project/$OUT/local/$ARCH/objs*/$LIB -name "*.o" | xargs touch -c
 		fi
 	done
 done
@@ -680,6 +762,7 @@ if [ -d "project/jni/application/src/AndroidData" ] ; then
 		fi
 	done
 	cp project/jni/application/src/AndroidData/* project/assets/
+	ln -s ../libs/armeabi/stdout-test project/assets/
 fi
 
 echo Done

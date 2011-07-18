@@ -17,28 +17,20 @@ fi
 NDK=`which ndk-build`
 NDK=`dirname $NDK`
 
-echo NDK $NDK
+#echo NDK $NDK
 GCCPREFIX=arm-linux-androideabi
 GCCVER=4.4.3
 PLATFORMVER=android-8
 LOCAL_PATH=`dirname $0`
 LOCAL_PATH=`cd $LOCAL_PATH && pwd`
-echo LOCAL_PATH $LOCAL_PATH
-
-if [ -z "`echo $NDK | grep 'android-ndk-r5b'``echo $NDK | grep 'android-ndk-r5-crystax'`" ] ; then
-	echo "The only supported NDK versions are android-ndk-r5b or android-ndk-r5-crystax"
-	exit 1
-fi
+#echo LOCAL_PATH $LOCAL_PATH
 
 APP_MODULES=`grep 'APP_MODULES [:][=]' $LOCAL_PATH/../Settings.mk | sed 's@.*[=]\(.*\)@\1@'`
 APP_AVAILABLE_STATIC_LIBS=`grep 'APP_AVAILABLE_STATIC_LIBS [:][=]' $LOCAL_PATH/../Settings.mk | sed 's@.*[=]\(.*\)@\1@'`
 APP_SHARED_LIBS=$(
 echo $APP_MODULES | xargs -n 1 echo | while read LIB ; do
-	STATIC=`echo $APP_AVAILABLE_STATIC_LIBS | grep "\\\\b$LIB\\\\b"`
-	if [ "$LIB" = "application" ] ; then true
-	elif [ "$LIB" = "sdl_main" ] ; then true
-	elif [ "$LIB" = "stlport" ] ; then true
-	elif [ -n "$STATIC" ] ; then true
+	STATIC=`echo $APP_AVAILABLE_STATIC_LIBS application sdl_main stlport stdout-test | grep "\\\\b$LIB\\\\b"`
+	if [ -n "$STATIC" ] ; then true
 	else
 		echo $LIB
 	fi
@@ -63,10 +55,18 @@ CFLAGS="\
 `echo $APP_MODULES | sed \"s@\([-a-zA-Z0-9_.]\+\)@-I$LOCAL_PATH/../\1/include@g\"` \
 $CRYSTAX_WCHAR_INCLUDE"
 
-#-shared flag creates problems with damn libtool, so we're using -Wl,-shared instead
+SHARED="-shared -Wl,-soname,libapplication.so"
+if [ -n "$BUILD_EXECUTABLE" ]; then
+	SHARED=
+fi
+if [ -n "$NO_SHARED_LIBS" ]; then
+	APP_SHARED_LIBS=
+fi
+
+
 LDFLAGS="\
--fexceptions -frtti -shared \
--Wl,-soname,libapplication.so --sysroot=$NDK/platforms/$PLATFORMVER/arch-arm \
+-fexceptions -frtti $SHARED \
+--sysroot=$NDK/platforms/$PLATFORMVER/arch-arm \
 `echo $APP_SHARED_LIBS | sed \"s@\([-a-zA-Z0-9_.]\+\)@$LOCAL_PATH/../../obj/local/armeabi/lib\1.so@g\"` \
 $NDK/platforms/$PLATFORMVER/arch-arm/usr/lib/libc.so \
 $NDK/platforms/$PLATFORMVER/arch-arm/usr/lib/libm.so \

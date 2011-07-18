@@ -76,6 +76,7 @@ static SDL_Surface *ANDROID_SetVideoModeMT(_THIS, SDL_Surface *current, int widt
 static void ANDROID_VideoQuitMT(_THIS);
 static void ANDROID_UpdateRectsMT(_THIS, int numrects, SDL_Rect *rects);
 static int ANDROID_FlipHWSurfaceMT(_THIS, SDL_Surface *surface);
+static int ANDROID_ToggleFullScreen(_THIS, int fullscreen);
 
 
 // Stubs to get rid of crashing in OpenGL mode
@@ -106,6 +107,10 @@ void ANDROID_WarpWMCursor(_THIS, Uint16 x, Uint16 y)
 }
 //void ANDROID_MoveWMCursor(_THIS, int x, int y) { }
 
+int ANDROID_ToggleFullScreen(_THIS, int fullscreen)
+{
+	return 1;
+}
 
 #define SDL_NUMMODES 12
 static SDL_Rect *SDL_modelist[SDL_NUMMODES+1];
@@ -191,6 +196,7 @@ static SDL_VideoDevice *ANDROID_CreateDevice(int devindex)
 	device->FreeWMCursor = ANDROID_FreeWMCursor;
 	device->CreateWMCursor = ANDROID_CreateWMCursor;
 	device->ShowWMCursor = ANDROID_ShowWMCursor;
+	device->ToggleFullScreen = ANDROID_ToggleFullScreen;
 
 	glLibraryHandle = dlopen("libGLESv1_CM.so", RTLD_NOW);
 	
@@ -1022,10 +1028,11 @@ void SDL_ANDROID_MultiThreadedVideoLoop()
 	{
 		int signalNeeded = 0;
 		int swapBuffersNeeded = 0;
+		int ret;
 		SDL_mutexP(videoThread.mutex);
 		videoThread.threadReady = 1;
 		SDL_CondSignal(videoThread.cond2);
-		SDL_CondWaitTimeout(videoThread.cond, videoThread.mutex, 1000);
+		ret = SDL_CondWaitTimeout(videoThread.cond, videoThread.mutex, SDL_ANDROID_CompatibilityHacks ? 400 : 1000);
 		if( videoThread.execute )
 		{
 			videoThread.threadReady = 0;
@@ -1052,6 +1059,11 @@ void SDL_ANDROID_MultiThreadedVideoLoop()
 			}
 			videoThread.execute = 0;
 			signalNeeded = 1;
+		}
+		else if( SDL_ANDROID_CompatibilityHacks && ret == SDL_MUTEX_TIMEDOUT && SDL_CurrentVideoSurface )
+		{
+			ANDROID_FlipHWSurfaceInternal();
+			swapBuffersNeeded = 1;
 		}
 		SDL_mutexV(videoThread.mutex);
 		if( signalNeeded )

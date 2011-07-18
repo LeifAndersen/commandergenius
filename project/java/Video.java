@@ -1,12 +1,22 @@
 /*
-    SDL - Simple DirectMedia Layer
-    Copyright (C) 1997-2011 Sam Lantinga
-    Java source code (C) 2009-2011 Sergii Pylypenko
+Simple DirectMedia Layer
+Java source code (C) 2009-2011 Sergii Pylypenko
+  
+This software is provided 'as-is', without any express or implied
+warranty.  In no event will the authors be held liable for any damages
+arising from the use of this software.
 
-    This library is free software; you can redistribute it and/or
-    modify it under the terms of the GNU Lesser General Public
-    License as published by the Free Software Foundation; either
-    version 2.1 of the License, or (at your option) any later version.
+Permission is granted to anyone to use this software for any purpose,
+including commercial applications, and to alter it and redistribute it
+freely, subject to the following restrictions:
+  
+1. The origin of this software must not be misrepresented; you must not
+   claim that you wrote the original software. If you use this software
+   in a product, an acknowledgment in the product documentation would be
+   appreciated but is not required. 
+2. Altered source versions must be plainly marked as such, and must not be
+   misrepresented as being the original software.
+3. This notice may not be removed or altered from any source distribution.
 */
 
 package net.sourceforge.clonekeenplus;
@@ -264,7 +274,7 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer
 		// Thread.currentThread().setPriority((Thread.currentThread().getPriority() + Thread.MIN_PRIORITY)/2);
 		
 		mGlContextLost = false;
-		
+
 		String libs[] = { "application", "sdl_main" };
 		try
 		{
@@ -275,13 +285,21 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer
 		}
 		catch ( UnsatisfiedLinkError e )
 		{
-			for(String l : libs)
+			System.out.println("libSDL: error loading lib: " + e.toString());
+			try
 			{
-				String libname = System.mapLibraryName(l);
-				File libpath = new File(context.getCacheDir(), libname);
-				System.out.println("libSDL: loading lib " + libpath.getPath());
-				System.load(libpath.getPath());
-				libpath.delete();
+				for(String l : libs)
+				{
+					String libname = System.mapLibraryName(l);
+					File libpath = new File(context.getCacheDir(), libname);
+					System.out.println("libSDL: loading lib " + libpath.getPath());
+					System.load(libpath.getPath());
+					libpath.delete();
+				}
+			}
+			catch ( UnsatisfiedLinkError ee )
+			{
+				System.out.println("libSDL: error loading lib: " + ee.toString());
 			}
 		}
 
@@ -290,9 +308,10 @@ class DemoRenderer extends GLSurfaceView_SDL.Renderer
 		// Tweak video thread priority, if user selected big audio buffer
 		if(Globals.AudioBufferConfig >= 2)
 			Thread.currentThread().setPriority( (Thread.NORM_PRIORITY + Thread.MIN_PRIORITY) / 2 ); // Lower than normal
+		 // Calls main() and never returns, hehe - we'll call eglSwapBuffers() from native code
 		nativeInit( Globals.DataDir,
 					Globals.CommandLine,
-					( Globals.SwVideoMode && Globals.MultiThreadedVideo ) ? 1 : 0 ); // Calls main() and never returns, hehe - we'll call eglSwapBuffers() from native code
+					( (Globals.SwVideoMode && Globals.MultiThreadedVideo) || Globals.CompatibilityHacks ) ? 1 : 0 );
 		System.exit(0); // The main() returns here - I don't bother with deinit stuff, just terminate process
 	}
 
